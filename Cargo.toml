@@ -1,0 +1,9 @@
+[package]
+name = "canicasbrawl-rapier"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rapier-bevy = { path = "../rapier-bevy" }
+bevy = "0.16.1"
+bevy_rapier3d = { version = "0.31.0", features = ["simd-stable", "debug-render-3d"] }
