@@ -1,5 +1,6 @@
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
+use bevy::transform::TransformSystem;
 use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
 use rapier_bevy::modes::{Mode, parse_mode, record_duration};
@@ -41,6 +42,7 @@ fn run_world_mode(mode: SimMode) {
         .add_plugins(GraphicsPlugin)
         .add_systems(Startup, (setup, set_gravity))
         .add_systems(Update, camera_follows_lowest_marble)
+        .add_systems(PostUpdate, update_marble_labels.after(TransformSystem::TransformPropagate))
         .insert_resource(mode);
 
     if let Some(secs) = record {
@@ -56,6 +58,9 @@ fn run_world_mode(mode: SimMode) {
 struct Marble {
     pub nickname: &'static str,
 }
+
+#[derive(Component)]
+struct MarbleLabel(Entity);
 
 struct MarbleConfig {
     nickname: &'static str,
@@ -248,6 +253,14 @@ fn spawn_marbles(
             nickname: cfg.nickname,
         });
 
+        commands.spawn((
+            Text2d::new(cfg.nickname),
+            TextFont { font_size: 20.0, ..default() },
+            TextColor(Color::BLACK),
+            TextLayout::new_with_justify(JustifyText::Center),
+            MarbleLabel(entity),
+        ));
+
         let quad_size = radius * 2.0;
         let bg_handle:  Handle<Image> = asset_server.load("characters/circle_white.png");
         let img_handle: Handle<Image> = asset_server.load(cfg.image);
@@ -277,6 +290,26 @@ fn spawn_marbles(
                 Transform::from_xyz(0.0, 0.0, half_depth + 0.002),
             ));
         });
+    }
+}
+
+fn update_marble_labels(
+    marbles: Query<&GlobalTransform, With<Marble>>,
+    mut labels: Query<(&mut Transform, &mut TextFont, &MarbleLabel)>,
+    camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+) {
+    let Ok((camera, cam_gt)) = camera_q.single() else { return };
+    let Some(viewport) = camera.logical_viewport_size() else { return };
+    // 2.2% del alto del viewport → tamaño relativo igual en ventana y en --record
+    let font_size = viewport.y * 0.022;
+    for (mut transform, mut font, MarbleLabel(marble_entity)) in &mut labels {
+        font.font_size = font_size;
+        let Ok(marble_gt) = marbles.get(*marble_entity) else { continue };
+        let above = marble_gt.translation() + Vec3::Y * 0.13;
+        if let Ok(screen_pos) = camera.world_to_viewport(cam_gt, above) {
+            transform.translation.x = screen_pos.x - viewport.x / 2.0;
+            transform.translation.y = viewport.y / 2.0 - screen_pos.y;
+        }
     }
 }
 
