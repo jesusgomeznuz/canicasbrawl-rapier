@@ -3,13 +3,9 @@ use rapier_bevy::{
     AssetsLoading, BodyType, ColliderShape, LockedAxes, ObjectDef, SimMode,
     VisualAppearance, VisualDef, spawn_object,
 };
-use crate::level::SpawnData;
 
 #[derive(Component)]
-pub struct Marble {
-    #[allow(dead_code)]
-    pub nickname: &'static str,
-}
+pub struct Marble;
 
 #[derive(Component)]
 pub struct MarbleLabel(pub Entity);
@@ -26,11 +22,12 @@ pub fn spawn_marbles(
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
-    spawn: Option<&SpawnData>,
+    spawn_cx: f32,
+    spawn_cy: f32,
     assets_loading: &mut Option<ResMut<AssetsLoading>>,
 ) {
     let roster = marble_roster();
-    let grid = spawn_grid(spawn);
+    let grid = spawn_grid(spawn_cx, spawn_cy);
     for (cfg, pos) in roster.iter().zip(grid.iter()) {
         let entity = spawn_marble_body(commands, mode, asset_server, meshes, materials, cfg, *pos);
         spawn_marble_label(commands, entity, cfg.nickname);
@@ -53,8 +50,7 @@ fn marble_roster() -> Vec<MarbleConfig> {
     ]
 }
 
-fn spawn_grid(spawn: Option<&SpawnData>) -> [(f32, f32); 9] {
-    let (cx, cy) = spawn.map(|s| (s.cx, s.cy)).unwrap_or((0.0, 10.3));
+fn spawn_grid(cx: f32, cy: f32) -> [(f32, f32); 9] {
     let dx = 0.25;
     let dy = 0.30;
     [
@@ -102,7 +98,7 @@ fn spawn_marble_body(
         meshes,
         materials,
     );
-    commands.entity(entity).insert(Marble { nickname: cfg.nickname });
+    commands.entity(entity).insert(Marble);
     entity
 }
 

@@ -1,6 +1,7 @@
 mod camera;
 mod level;
 mod marbles;
+mod process_modules;
 mod world;
 
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
@@ -14,23 +15,14 @@ use rapier_bevy::{GraphicsPlugin, PhysicsStatsPlugin, RecordPlugin, SimMode};
 pub(crate) const UNIT: f32 = 0.35;
 
 fn main() {
-    if figma_export_requested() { run_figma_export(); return; }
+    if std::env::args().any(|a| a == "--process-modules") {
+        process_modules::run();
+        return;
+    }
     match parse_mode() {
         Mode::Preprocess => {}
         Mode::Sim(mode) => run_world_mode(mode),
     }
-}
-
-fn figma_export_requested() -> bool {
-    std::env::args().any(|a| a == "--process-figma")
-}
-
-fn run_figma_export() {
-    let status = std::process::Command::new("python3")
-        .arg("figma_export.py")
-        .status()
-        .expect("No se pudo ejecutar python3. ¿Está instalado?");
-    std::process::exit(if status.success() { 0 } else { 1 });
 }
 
 fn run_world_mode(mode: SimMode) {

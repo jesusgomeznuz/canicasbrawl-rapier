@@ -1,1 +1,5 @@
 /target
+.env
+.DS_Store
+outputs/
+assets/modules/raw/
