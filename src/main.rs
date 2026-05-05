@@ -9,12 +9,39 @@ use rapier_bevy::{
     PhysicsStatsPlugin, RecordPlugin, SimMode, VisualAppearance, VisualDef, spawn_object,
 };
 
-// 1 unit = 1 metro, gravedad -9.81 m/s².
-// Canicas de radio 0.08 m — "game scale" que llena visualmente el arena de 1.1 m de ancho.{}
-
 const UNIT: f32 = 0.35;
 
+#[derive(serde::Deserialize)]
+struct PlatformData {
+    x: f32, y: f32, hx: f32, hy: f32, rot: f32, angvel_z: f32,
+}
+
+#[derive(serde::Deserialize)]
+struct SpawnData {
+    cx: f32, cy: f32,
+}
+
+#[derive(serde::Deserialize)]
+struct LevelData {
+    platforms: Vec<PlatformData>,
+    floor_y: Option<f32>,
+    spawn: Option<SpawnData>,
+}
+
+fn load_level() -> LevelData {
+    let json = std::fs::read_to_string("assets/levels/level_01.json")
+        .expect("No se encontró assets/levels/level_01.json — corre: cargo run -- --process-figma");
+    serde_json::from_str(&json).expect("level_01.json tiene formato inválido")
+}
+
 fn main() {
+    if std::env::args().any(|a| a == "--process-figma") {
+        let status = std::process::Command::new("python3")
+            .arg("figma_export.py")
+            .status()
+            .expect("No se pudo ejecutar python3. ¿Está instalado?");
+        std::process::exit(if status.success() { 0 } else { 1 });
+    }
     match parse_mode() {
         Mode::Preprocess => {}
         Mode::Sim(mode) => run_world_mode(mode),
@@ -42,7 +69,11 @@ fn run_world_mode(mode: SimMode) {
         .add_plugins(GraphicsPlugin)
         .add_systems(Startup, (setup, set_gravity))
         .add_systems(Update, camera_follows_lowest_marble)
-        .add_systems(PostUpdate, update_marble_labels.after(TransformSystem::TransformPropagate))
+        .add_systems(
+            PostUpdate,
+            update_marble_labels.after(TransformSystem::TransformPropagate),
+        )
+        .insert_resource(ClearColor(Color::srgb(0.329, 0.765, 0.980)))
         .insert_resource(mode);
 
     if let Some(secs) = record {
@@ -76,10 +107,16 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut assets_loading: Option<ResMut<AssetsLoading>>,
 ) {
-    spawn_floor(&mut commands, &mode, &asset_server, &mut meshes, &mut materials);
+    let level = load_level();
+    spawn_floor(&mut commands, &mode, &asset_server, &mut meshes, &mut materials,
+        level.floor_y.unwrap_or(0.0));
     spawn_side_walls(&mut commands, &mode, &asset_server, &mut meshes, &mut materials);
-    spawn_zigzag_platforms(&mut commands, &mode, &asset_server, &mut meshes, &mut materials);
-    spawn_marbles(&mut commands, &mode, &asset_server, &mut meshes, &mut materials, &mut assets_loading);
+    for p in &level.platforms {
+        spawn_platform(&mut commands, &mode, &asset_server, &mut meshes, &mut materials,
+            p.x, p.y, p.hx, p.hy, p.rot, p.angvel_z);
+    }
+    spawn_marbles(&mut commands, &mode, &asset_server, &mut meshes, &mut materials,
+        level.spawn.as_ref(), &mut assets_loading);
 }
 
 fn spawn_floor(
@@ -88,18 +125,15 @@ fn spawn_floor(
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    floor_y: f32,
 ) {
-    let half_width = 0.55;
+    let hy = 0.03_f32;
     spawn_object(
         commands,
         ObjectDef {
-            shape: ColliderShape::Box {
-                hx: half_width + 0.05,
-                hy: 0.03,
-                hz: UNIT,
-            },
-            position: Vec3::new(0.0, -0.03, 0.0),
-            visual: Some(VisualDef::grass_green()),
+            shape: ColliderShape::Box { hx: 10.0, hy, hz: 3.0 },
+            position: Vec3::new(0.0, floor_y - hy, 0.0),
+            visual: Some(VisualDef { border_radius: Some(0.02), ..VisualDef::white_matte() }),
             restitution: Some(0.05),
             friction: Some(0.7),
             ..Default::default()
@@ -119,7 +153,7 @@ fn spawn_side_walls(
     materials: &mut Assets<StandardMaterial>,
 ) {
     let half_width = 0.55;
-    let arena_height = 10.0;
+    let arena_height = 50.0;
     let wall_shape = ColliderShape::Box {
         hx: 0.05,
         hy: arena_height / 2.0,
@@ -133,7 +167,7 @@ fn spawn_side_walls(
             ObjectDef {
                 shape: wall_shape.clone(),
                 position: Vec3::new(x_sign * (half_width + 0.05), wall_y, 0.0),
-                visual: Some(VisualDef::white_matte()),
+                visual: Some(VisualDef { border_radius: Some(0.02), ..VisualDef::white_matte() }),
                 restitution: Some(0.05),
                 ..Default::default()
             },
@@ -145,43 +179,51 @@ fn spawn_side_walls(
     }
 }
 
-fn spawn_zigzag_platforms(
+
+fn spawn_platform(
     commands: &mut Commands,
     mode: &SimMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    x: f32,
+    y: f32,
+    hx: f32,
+    hy: f32,
+    rotation: f32,
+    angvel_z: f32,
 ) {
-    let tilt = std::f32::consts::FRAC_PI_6; // 30°
-    // (center_x, y, tilt_z) — negativo = lado derecho más bajo, canicas caen a la derecha
-    let platforms = [
-        (-0.25_f32, 2.8_f32, -tilt),
-        (0.25, 2.0, tilt),
-        (-0.25, 1.2, -tilt),
-        (0.25, 0.4, tilt),
-    ];
-
-    for (cx, y, tilt_z) in platforms {
-        spawn_object(
-            commands,
-            ObjectDef {
-                shape: ColliderShape::Box {
-                    hx: 0.50,
-                    hy: 0.03,
-                    hz: UNIT * 0.5 / 2.0,
-                },
-                position: Vec3::new(cx, y, 0.0),
-                rotation: Quat::from_rotation_z(tilt_z),
-                visual: Some(VisualDef::white_matte()),
-                restitution: Some(0.05),
-                friction: Some(0.15),
-                ..Default::default()
+    let spinning = angvel_z != 0.0;
+    let entity = spawn_object(
+        commands,
+        ObjectDef {
+            shape: ColliderShape::Box {
+                hx,
+                hy,
+                hz: UNIT * 0.5 / 2.0,
             },
-            mode,
-            asset_server,
-            meshes,
-            materials,
-        );
+            position: Vec3::new(x, y, 0.0),
+            rotation: Quat::from_rotation_z(rotation),
+            body: if spinning {
+                BodyType::Kinematic
+            } else {
+                BodyType::Static
+            },
+            visual: Some(VisualDef { border_radius: Some(0.02), ..VisualDef::white_matte() }),
+            restitution: Some(0.05),
+            friction: Some(0.15),
+            ..Default::default()
+        },
+        mode,
+        asset_server,
+        meshes,
+        materials,
+    );
+    if spinning {
+        commands.entity(entity).insert(Velocity {
+            linvel: Vec3::ZERO,
+            angvel: Vec3::new(0.0, 0.0, angvel_z),
+        });
     }
 }
 
@@ -191,30 +233,64 @@ fn spawn_marbles(
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    spawn: Option<&SpawnData>,
     assets_loading: &mut Option<ResMut<AssetsLoading>>,
 ) {
     let marbles: &[MarbleConfig] = &[
-        MarbleConfig { nickname: "Goku",     color: Color::srgb(0.90, 0.85, 0.60), image: "characters/Goku.png" },
-        MarbleConfig { nickname: "Bart",     color: Color::srgb(0.95, 0.85, 0.10), image: "characters/bart.png" },
-        MarbleConfig { nickname: "Naruto",   color: Color::srgb(0.95, 0.45, 0.05), image: "characters/naruto.png" },
-        MarbleConfig { nickname: "Finn",     color: Color::srgb(0.30, 0.65, 0.90), image: "characters/finn.png" },
-        MarbleConfig { nickname: "Rick",     color: Color::srgb(0.55, 0.80, 0.55), image: "characters/rick.png" },
-        MarbleConfig { nickname: "Shrek",    color: Color::srgb(0.40, 0.65, 0.20), image: "characters/shrek.png" },
-        MarbleConfig { nickname: "Vegeta",   color: Color::srgb(0.55, 0.10, 0.80), image: "characters/vegeta.png" },
-        MarbleConfig { nickname: "Patricio", color: Color::srgb(0.95, 0.55, 0.70), image: "characters/patricio.png" },
-        MarbleConfig { nickname: "Gumball",  color: Color::srgb(0.30, 0.55, 0.90), image: "characters/gumball.png" },
+        MarbleConfig {
+            nickname: "Goku",
+            color: Color::srgb(0.90, 0.85, 0.60),
+            image: "characters/Goku.png",
+        },
+        MarbleConfig {
+            nickname: "Bart",
+            color: Color::srgb(0.95, 0.85, 0.10),
+            image: "characters/bart.png",
+        },
+        MarbleConfig {
+            nickname: "Naruto",
+            color: Color::srgb(0.95, 0.45, 0.05),
+            image: "characters/naruto.png",
+        },
+        MarbleConfig {
+            nickname: "Finn",
+            color: Color::srgb(0.30, 0.65, 0.90),
+            image: "characters/finn.png",
+        },
+        MarbleConfig {
+            nickname: "Rick",
+            color: Color::srgb(0.55, 0.80, 0.55),
+            image: "characters/rick.png",
+        },
+        MarbleConfig {
+            nickname: "Shrek",
+            color: Color::srgb(0.40, 0.65, 0.20),
+            image: "characters/shrek.png",
+        },
+        MarbleConfig {
+            nickname: "Vegeta",
+            color: Color::srgb(0.55, 0.10, 0.80),
+            image: "characters/vegeta.png",
+        },
+        MarbleConfig {
+            nickname: "Patricio",
+            color: Color::srgb(0.95, 0.55, 0.70),
+            image: "characters/patricio.png",
+        },
+        MarbleConfig {
+            nickname: "Gumball",
+            color: Color::srgb(0.30, 0.55, 0.90),
+            image: "characters/gumball.png",
+        },
     ];
-    // Grid 3×3: fila superior primero, de izquierda a derecha
+    // Grid 3×3 centrado en spawn_area (si está en el JSON) o posición por defecto
+    let (cx, cy) = spawn.map(|s| (s.cx, s.cy)).unwrap_or((0.0, 10.3));
+    let dx = 0.25;
+    let dy = 0.30;
     let grid: [(f32, f32); 9] = [
-        (-0.25, 4.2),
-        (0.0, 4.2),
-        (0.25, 4.2),
-        (-0.25, 3.9),
-        (0.0, 3.9),
-        (0.25, 3.9),
-        (-0.25, 3.6),
-        (0.0, 3.6),
-        (0.25, 3.6),
+        (cx - dx, cy + dy), (cx, cy + dy), (cx + dx, cy + dy),
+        (cx - dx, cy),      (cx, cy),      (cx + dx, cy),
+        (cx - dx, cy - dy), (cx, cy - dy), (cx + dx, cy - dy),
     ];
     let radius = 0.09;
     let half_depth = UNIT / 2.0 / 2.0;
@@ -255,14 +331,17 @@ fn spawn_marbles(
 
         commands.spawn((
             Text2d::new(cfg.nickname),
-            TextFont { font_size: 20.0, ..default() },
+            TextFont {
+                font_size: 20.0,
+                ..default()
+            },
             TextColor(Color::BLACK),
             TextLayout::new_with_justify(JustifyText::Center),
             MarbleLabel(entity),
         ));
 
         let quad_size = radius * 2.0;
-        let bg_handle:  Handle<Image> = asset_server.load("characters/circle_white.png");
+        let bg_handle: Handle<Image> = asset_server.load("characters/circle_white.png");
         let img_handle: Handle<Image> = asset_server.load(cfg.image);
         if let Some(al) = assets_loading.as_deref_mut() {
             al.0.push(bg_handle.clone().untyped());
@@ -298,13 +377,19 @@ fn update_marble_labels(
     mut labels: Query<(&mut Transform, &mut TextFont, &MarbleLabel)>,
     camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
-    let Ok((camera, cam_gt)) = camera_q.single() else { return };
-    let Some(viewport) = camera.logical_viewport_size() else { return };
+    let Ok((camera, cam_gt)) = camera_q.single() else {
+        return;
+    };
+    let Some(viewport) = camera.logical_viewport_size() else {
+        return;
+    };
     // 2.2% del alto del viewport → tamaño relativo igual en ventana y en --record
     let font_size = viewport.y * 0.022;
     for (mut transform, mut font, MarbleLabel(marble_entity)) in &mut labels {
         font.font_size = font_size;
-        let Ok(marble_gt) = marbles.get(*marble_entity) else { continue };
+        let Ok(marble_gt) = marbles.get(*marble_entity) else {
+            continue;
+        };
         let above = marble_gt.translation() + Vec3::Y * 0.13;
         if let Ok(screen_pos) = camera.world_to_viewport(cam_gt, above) {
             transform.translation.x = screen_pos.x - viewport.x / 2.0;
@@ -324,7 +409,7 @@ fn camera_follows_lowest_marble(
     mut camera: Query<&mut Transform, (With<Camera3d>, Without<Marble>)>,
 ) {
     let cam_z = 2.5;
-    let cam_y_offset = 0.8;
+    let cam_y_offset = 0.2;
 
     let Some(lowest_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else {
         return;
@@ -334,5 +419,5 @@ fn camera_follows_lowest_marble(
     };
 
     cam.translation = Vec3::new(0.0, lowest_y + cam_y_offset, cam_z);
-    *cam = cam.looking_at(Vec3::new(0.0, lowest_y, 0.0), Vec3::Y);
+    cam.rotation = Quat::IDENTITY;
 }
