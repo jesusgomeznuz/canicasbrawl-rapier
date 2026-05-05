@@ -55,7 +55,12 @@ fn spawn_level(
     materials: &mut Assets<StandardMaterial>,
 ) -> (f32, f32) {
     let spawn_y = 0.0;
-    let modules = ["crosses", "zigzag", "crosses", "zigzag"];
+    let modules = [
+        "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag",
+        "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag",
+        "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag",
+        "crosses", "zigzag",
+    ];
     let mut next_top = spawn_y;
     for name in modules {
         next_top = spawn_module(

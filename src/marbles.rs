@@ -8,6 +8,9 @@ use rapier_bevy::{
 pub struct Marble;
 
 #[derive(Component)]
+pub struct MarbleName(pub &'static str);
+
+#[derive(Component)]
 pub struct MarbleLabel(pub Entity);
 
 pub struct MarbleConfig {
@@ -38,15 +41,15 @@ pub fn spawn_marbles(
 fn marble_roster() -> Vec<MarbleConfig> {
     let white = Color::srgb(0.92, 0.92, 0.90);
     vec![
-        MarbleConfig { nickname: "Goku",     color: white, image: "characters/Goku.png" },
-        MarbleConfig { nickname: "Bart",      color: white, image: "characters/bart.png" },
-        MarbleConfig { nickname: "Naruto",    color: white, image: "characters/naruto.png" },
-        MarbleConfig { nickname: "Finn",      color: white, image: "characters/finn.png" },
-        MarbleConfig { nickname: "Rick",      color: white, image: "characters/rick.png" },
-        MarbleConfig { nickname: "Shrek",     color: white, image: "characters/shrek.png" },
-        MarbleConfig { nickname: "Vegeta",    color: white, image: "characters/vegeta.png" },
-        MarbleConfig { nickname: "Patricio",  color: white, image: "characters/patricio.png" },
-        MarbleConfig { nickname: "Gumball",   color: white, image: "characters/gumball.png" },
+        MarbleConfig { nickname: "Bart",       color: white, image: "characters/bart.png" },
+        MarbleConfig { nickname: "BMO",        color: white, image: "characters/bmo.png" },
+        MarbleConfig { nickname: "Darwin",     color: white, image: "characters/darwin.png" },
+        MarbleConfig { nickname: "Gru",        color: white, image: "characters/gru.png" },
+        MarbleConfig { nickname: "Gumball",    color: white, image: "characters/gumball.png" },
+        MarbleConfig { nickname: "Jake",       color: white, image: "characters/jake.png" },
+        MarbleConfig { nickname: "Quico",      color: white, image: "characters/quico.png" },
+        MarbleConfig { nickname: "ReyHelado",  color: white, image: "characters/reyhelado.png" },
+        MarbleConfig { nickname: "Mordecai",   color: white, image: "characters/mordecai.png" },
     ]
 }
 
@@ -98,7 +101,7 @@ fn spawn_marble_body(
         meshes,
         materials,
     );
-    commands.entity(entity).insert(Marble);
+    commands.entity(entity).insert((Marble, MarbleName(cfg.nickname)));
     entity
 }
 

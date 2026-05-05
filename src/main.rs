@@ -2,6 +2,7 @@ mod camera;
 mod level;
 mod marbles;
 mod process_modules;
+mod race;
 mod world;
 
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
@@ -45,11 +46,13 @@ fn run_world_mode(mode: SimMode) {
     app.add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugins(GraphicsPlugin)
         .add_systems(Startup, (world::setup, world::set_gravity))
-        .add_systems(Update, camera::camera_follows_lowest_marble)
+        .add_systems(Update, (camera::camera_follows_lowest_marble, race::track_race_leader))
         .add_systems(
             PostUpdate,
             camera::update_marble_labels.after(TransformSystem::TransformPropagate),
         )
+        .add_systems(Last, race::save_voice_tracker_on_exit)
+        .insert_resource(race::VoiceTracker::default())
         .insert_resource(ClearColor(Color::srgb(0.329, 0.765, 0.980)))
         .insert_resource(mode);
 
