@@ -1,4 +1,4 @@
-use crate::level::{ModuleData, load_module};
+use super::level::{ModuleData, load_module};
 use bevy::prelude::*;
 use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
@@ -29,7 +29,7 @@ pub fn setup(
         &mut meshes,
         &mut materials,
     );
-    crate::marbles::spawn_marbles(
+    super::marbles::spawn_marbles(
         &mut commands,
         &mode,
         &asset_server,
@@ -115,7 +115,7 @@ fn spawn_module(
                     BodyType::Static
                 },
                 visual: Some(VisualDef {
-                    border_radius: Some(0.02),
+                    border_radius: p.border_radius.or(Some(0.02)),
                     ..VisualDef::white_matte()
                 }),
                 restitution: Some(0.05),

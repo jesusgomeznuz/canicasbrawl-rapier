@@ -1,7 +1,7 @@
 use bevy::app::AppExit;
 use bevy::diagnostic::FrameCount;
 use bevy::prelude::*;
-use crate::marbles::{Marble, MarbleName};
+use crate::game::marbles::{Marble, MarbleName};
 use serde::Serialize;
 use std::fs;
 

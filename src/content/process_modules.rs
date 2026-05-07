@@ -2,10 +2,6 @@
 struct RawRect {
     name: String,
     x: f32, y: f32, w: f32, h: f32,
-    #[serde(default)]
-    inner_w: Option<f32>,
-    #[serde(default)]
-    inner_h: Option<f32>,
 }
 
 #[derive(serde::Deserialize)]
@@ -19,6 +15,8 @@ struct RawModule {
 #[derive(serde::Serialize)]
 struct PlatformData {
     x: f32, y: f32, hx: f32, hy: f32, rot: f32, angvel_z: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    border_radius: Option<f32>,
 }
 
 #[derive(serde::Serialize)]
@@ -63,22 +61,24 @@ fn transform(raw: RawModule) -> ModuleData {
 }
 
 fn platform_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> PlatformData {
-    let cx_figma = r.x + r.w / 2.0;
-    let cy_figma = r.y + r.h / 2.0;
-    let collider_w = r.inner_w.unwrap_or(r.w);
-    let collider_h = r.inner_h.unwrap_or(r.h);
+    let rot = rot_from_name(&r.name).to_radians();
+    let half_w = r.w / 2.0;
+    let half_h = r.h / 2.0;
+    let (sin, cos) = rot.sin_cos();
+    let cx_figma = r.x + half_w * cos + half_h * sin;
+    let cy_figma = r.y - half_w * sin + half_h * cos;
 
     let game_x = (cx_figma - frame_w / 2.0) * 0.01;
-    let game_y = (frame_h - cy_figma)        * 0.01;
-    let hx     = collider_w / 2.0            * 0.01;
-    let hy     = collider_h / 2.0            * 0.01;
-    let rot    = rot_from_name(&r.name).to_radians();
+    let game_y = (frame_h - cy_figma)       * 0.01;
+    let hx = half_w * 0.01;
+    let hy = half_h * 0.01;
     let angvel_z = angvel_from_name(&r.name);
 
     PlatformData {
         x: round4(game_x), y: round4(game_y),
         hx: round4(hx),    hy: round4(hy),
         rot: round4(rot),  angvel_z,
+        border_radius: br_from_name(&r.name),
     }
 }
 
@@ -88,6 +88,13 @@ fn rot_from_name(name: &str) -> f32 {
 
 fn angvel_from_name(name: &str) -> f32 {
     parse_tagged_number(name, "|w")
+}
+
+fn br_from_name(name: &str) -> Option<f32> {
+    let start = name.find("|br")?;
+    let rest = &name[start + 3..];
+    let end = rest.find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-')).unwrap_or(rest.len());
+    rest[..end].parse::<f32>().ok()
 }
 
 fn parse_tagged_number(name: &str, tag: &str) -> f32 {

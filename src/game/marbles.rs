@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use rapier_bevy::{
-    AssetsLoading, BodyType, ColliderShape, LockedAxes, ObjectDef, SimMode,
-    VisualAppearance, VisualDef, spawn_object,
+    AssetsLoading, BodyType, ColliderShape, LockedAxes, ObjectDef, SimMode, VisualDef,
+    spawn_object,
 };
 
 #[derive(Component)]
@@ -15,7 +15,6 @@ pub struct MarbleLabel(pub Entity);
 
 pub struct MarbleConfig {
     pub nickname: &'static str,
-    pub color: Color,
     pub image: &'static str,
 }
 
@@ -39,17 +38,16 @@ pub fn spawn_marbles(
 }
 
 fn marble_roster() -> Vec<MarbleConfig> {
-    let white = Color::srgb(0.92, 0.92, 0.90);
     vec![
-        MarbleConfig { nickname: "Bart",       color: white, image: "characters/bart.png" },
-        MarbleConfig { nickname: "BMO",        color: white, image: "characters/bmo.png" },
-        MarbleConfig { nickname: "Darwin",     color: white, image: "characters/darwin.png" },
-        MarbleConfig { nickname: "Gru",        color: white, image: "characters/gru.png" },
-        MarbleConfig { nickname: "Gumball",    color: white, image: "characters/gumball.png" },
-        MarbleConfig { nickname: "Jake",       color: white, image: "characters/jake.png" },
-        MarbleConfig { nickname: "Quico",      color: white, image: "characters/quico.png" },
-        MarbleConfig { nickname: "ReyHelado",  color: white, image: "characters/reyhelado.png" },
-        MarbleConfig { nickname: "Mordecai",   color: white, image: "characters/mordecai.png" },
+        MarbleConfig { nickname: "Bart",      image: "characters/bart.png" },
+        MarbleConfig { nickname: "BMO",       image: "characters/bmo.png" },
+        MarbleConfig { nickname: "Darwin",    image: "characters/darwin.png" },
+        MarbleConfig { nickname: "Gru",       image: "characters/gru.png" },
+        MarbleConfig { nickname: "Gumball",   image: "characters/gumball.png" },
+        MarbleConfig { nickname: "Jake",      image: "characters/jake.png" },
+        MarbleConfig { nickname: "Quico",     image: "characters/quico.png" },
+        MarbleConfig { nickname: "ReyHelado", image: "characters/reyhelado.png" },
+        MarbleConfig { nickname: "Mordecai",  image: "characters/mordecai.png" },
     ]
 }
 
@@ -90,10 +88,7 @@ fn spawn_marble_body(
                     | LockedAxes::ROTATION_LOCKED_X
                     | LockedAxes::ROTATION_LOCKED_Y,
             ),
-            visual: Some(VisualDef {
-                appearance: VisualAppearance::Color(cfg.color),
-                ..VisualDef::white_matte()
-            }),
+            visual: Some(VisualDef::white_matte()),
             ..Default::default()
         },
         mode,

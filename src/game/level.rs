@@ -1,6 +1,8 @@
 #[derive(serde::Deserialize, Clone, Copy)]
 pub struct PlatformData {
     pub x: f32, pub y: f32, pub hx: f32, pub hy: f32, pub rot: f32, pub angvel_z: f32,
+    #[serde(default)]
+    pub border_radius: Option<f32>,
 }
 
 #[derive(serde::Deserialize)]

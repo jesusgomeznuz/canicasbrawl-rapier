@@ -8,6 +8,12 @@
         "@vkhanhqui/figma-mcp-go@latest"
       ],
       "env": {}
+    },
+    "mermaid": {
+      "type": "stdio",
+      "command": "/Users/jesus/.nvm/versions/node/v23.3.0/bin/mermaid-mcp-server",
+      "args": [],
+      "env": {}
     }
   }
 }
