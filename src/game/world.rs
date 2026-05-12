@@ -1,4 +1,4 @@
-use super::level::{ModuleData, load_module};
+use super::level::{ModuleData, WorldObject, load_module};
 use bevy::prelude::*;
 use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
@@ -56,10 +56,9 @@ fn spawn_level(
 ) -> (f32, f32) {
     let spawn_y = 0.0;
     let modules = [
-        "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag",
-        "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag",
-        "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag", "crosses", "zigzag",
-        "crosses", "zigzag",
+        "crosses", "zigzag", "spheres", "toruses", "crosses", "zigzag", "spheres", "crosses",
+        "zigzag", "spheres", "crosses", "zigzag", "spheres", "crosses", "zigzag", "spheres",
+        "crosses", "zigzag", "spheres",
     ];
     let mut next_top = spawn_y;
     for name in modules {
@@ -95,44 +94,74 @@ fn spawn_module(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
 ) -> f32 {
-    let ModuleData { height, platforms } = load_module(name);
+    let ModuleData { height, objects } = load_module(name);
     let y_offset = level_top - height;
-    for p in &platforms {
-        let spinning = p.angvel_z != 0.0;
-        let entity = spawn_object(
-            commands,
-            ObjectDef {
+    for obj in &objects {
+        let def = match obj {
+            WorldObject::Box {
+                x,
+                y,
+                hx,
+                hy,
+                rot,
+                angvel,
+                border_radius,
+            } => ObjectDef {
                 shape: ColliderShape::Box {
-                    hx: p.hx,
-                    hy: p.hy,
+                    hx: *hx,
+                    hy: *hy,
                     hz: crate::UNIT / 4.0,
                 },
-                position: Vec3::new(p.x, p.y + y_offset, 0.0),
-                rotation: Quat::from_rotation_z(p.rot),
-                body: if spinning {
+                position: Vec3::new(*x, *y + y_offset, 0.0),
+                rotation: Quat::from_rotation_z(*rot),
+                body: if angvel != &[0.0; 3] {
                     BodyType::Kinematic
                 } else {
                     BodyType::Static
                 },
+                angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
                 visual: Some(VisualDef {
-                    border_radius: p.border_radius.or(Some(0.02)),
+                    border_radius: border_radius.or(Some(0.02)),
                     ..VisualDef::white_matte()
                 }),
                 restitution: Some(0.05),
                 friction: Some(0.15),
                 ..Default::default()
             },
-            mode,
-            asset_server,
-            meshes,
-            materials,
-        );
-        if spinning {
-            commands.entity(entity).insert(Velocity {
-                linvel: Vec3::ZERO,
-                angvel: Vec3::new(0.0, 0.0, p.angvel_z),
-            });
-        }
+            WorldObject::Sphere { x, y, radius } => ObjectDef {
+                shape: ColliderShape::Sphere { radius: *radius },
+                position: Vec3::new(*x, *y + y_offset, 0.0),
+                body: BodyType::Static,
+                visual: Some(VisualDef::white_matte()),
+                restitution: Some(0.05),
+                friction: Some(0.15),
+                ..Default::default()
+            },
+            WorldObject::Mesh {
+                x,
+                y,
+                rot,
+                model_name,
+                angvel,
+            } => ObjectDef {
+                shape: ColliderShape::MeshObject {
+                    model_name: model_name.clone(),
+                },
+                position: Vec3::new(*x, *y + y_offset, 0.0),
+                rotation: Quat::from_rotation_z(*rot),
+                body: if angvel != &[0.0; 3] {
+                    BodyType::Kinematic
+                } else {
+                    BodyType::Static
+                },
+                angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
+                visual: Some(VisualDef::white_matte()),
+                restitution: Some(0.05),
+                friction: Some(0.15),
+                ..Default::default()
+            },
+        };
+        spawn_object(commands, def, mode, asset_server, meshes, materials);
     }
     y_offset
 }

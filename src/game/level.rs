@@ -1,14 +1,25 @@
-#[derive(serde::Deserialize, Clone, Copy)]
-pub struct PlatformData {
-    pub x: f32, pub y: f32, pub hx: f32, pub hy: f32, pub rot: f32, pub angvel_z: f32,
-    #[serde(default)]
-    pub border_radius: Option<f32>,
+#[derive(serde::Deserialize, Clone)]
+#[serde(tag = "kind")]
+pub enum WorldObject {
+    Box {
+        x: f32, y: f32, hx: f32, hy: f32, rot: f32,
+        #[serde(default)]
+        angvel: [f32; 3],
+        #[serde(default)]
+        border_radius: Option<f32>,
+    },
+    Sphere { x: f32, y: f32, radius: f32 },
+    Mesh {
+        x: f32, y: f32, rot: f32, model_name: String,
+        #[serde(default)]
+        angvel: [f32; 3],
+    },
 }
 
 #[derive(serde::Deserialize)]
 pub struct ModuleData {
     pub height: f32,
-    pub platforms: Vec<PlatformData>,
+    pub objects: Vec<WorldObject>,
 }
 
 pub fn load_module(name: &str) -> ModuleData {

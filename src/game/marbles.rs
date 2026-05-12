@@ -39,15 +39,15 @@ pub fn spawn_marbles(
 
 fn marble_roster() -> Vec<MarbleConfig> {
     vec![
+        MarbleConfig { nickname: "Marceline", image: "characters/marceline.png" },
+        MarbleConfig { nickname: "Perla",     image: "characters/perla.png" },
+        MarbleConfig { nickname: "Steven",    image: "characters/steven.png" },
+        MarbleConfig { nickname: "Wendy",     image: "characters/wendy.png" },
+        MarbleConfig { nickname: "Naruto",    image: "characters/naruto.png" },
+        MarbleConfig { nickname: "Ben10",     image: "characters/ben10.png" },
+        MarbleConfig { nickname: "Patricio",  image: "characters/patricio.png" },
+        MarbleConfig { nickname: "Finn",      image: "characters/finn.png" },
         MarbleConfig { nickname: "Bart",      image: "characters/bart.png" },
-        MarbleConfig { nickname: "BMO",       image: "characters/bmo.png" },
-        MarbleConfig { nickname: "Darwin",    image: "characters/darwin.png" },
-        MarbleConfig { nickname: "Gru",       image: "characters/gru.png" },
-        MarbleConfig { nickname: "Gumball",   image: "characters/gumball.png" },
-        MarbleConfig { nickname: "Jake",      image: "characters/jake.png" },
-        MarbleConfig { nickname: "Quico",     image: "characters/quico.png" },
-        MarbleConfig { nickname: "ReyHelado", image: "characters/reyhelado.png" },
-        MarbleConfig { nickname: "Mordecai",  image: "characters/mordecai.png" },
     ]
 }
 
