@@ -51,6 +51,7 @@ fn run_sim(mode: SimMode) {
         Startup,
         (
             game::camera::spawn_camera_and_lights,
+            game::camera::spawn_leader_crown,
             game::world::setup,
             game::world::set_gravity,
         ),
@@ -64,7 +65,12 @@ fn run_sim(mode: SimMode) {
     )
     .add_systems(
         PostUpdate,
-        game::camera::update_marble_labels.after(TransformSystem::TransformPropagate),
+        (
+            game::camera::update_marble_labels,
+            game::camera::update_leader_crown,
+        )
+            .chain()
+            .after(TransformSystem::TransformPropagate),
     )
     .add_systems(Last, production::voice_tracker::save_voice_tracker_on_exit)
     .run();

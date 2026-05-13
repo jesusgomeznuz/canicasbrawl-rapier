@@ -1,14 +1,94 @@
 {
-  "height": 3.79,
   "objects": [
-    { "kind": "Box", "x":  0.0028, "y": 2.8072, "hx": 0.2, "hy": 0.2, "rot": 0.7854, "border_radius": 0.03 },
-    { "kind": "Box", "x":  0.0028, "y": 1.9972, "hx": 0.2, "hy": 0.2, "rot": 0.7854, "border_radius": 0.03 },
-    { "kind": "Box", "x":  0.0028, "y": 1.1872, "hx": 0.2, "hy": 0.2, "rot": 0.7854, "border_radius": 0.03 },
-    { "kind": "Box", "x": -0.5472, "y": 3.1972, "hx": 0.2, "hy": 0.2, "rot": 0.7854, "border_radius": 0.03 },
-    { "kind": "Box", "x": -0.5472, "y": 2.3872, "hx": 0.2, "hy": 0.2, "rot": 0.7854, "border_radius": 0.03 },
-    { "kind": "Box", "x": -0.5472, "y": 1.5772, "hx": 0.2, "hy": 0.2, "rot": 0.7854, "border_radius": 0.03 },
-    { "kind": "Box", "x":  0.5528, "y": 3.1972, "hx": 0.2, "hy": 0.2, "rot": 0.7854, "border_radius": 0.03 },
-    { "kind": "Box", "x":  0.5528, "y": 2.3872, "hx": 0.2, "hy": 0.2, "rot": 0.7854, "border_radius": 0.03 },
-    { "kind": "Box", "x":  0.5528, "y": 1.5772, "hx": 0.2, "hy": 0.2, "rot": 0.7854, "border_radius": 0.03 }
+    {
+      "kind": "Box",
+      "x": 0.0028,
+      "y": 1.9572,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03
+    },
+    {
+      "kind": "Box",
+      "x": 0.0028,
+      "y": 1.1472,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03
+    },
+    {
+      "kind": "Box",
+      "x": 0.0028,
+      "y": 0.3372,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03
+    },
+    {
+      "kind": "Box",
+      "x": -0.5472,
+      "y": 2.3472,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03
+    },
+    {
+      "kind": "Box",
+      "x": -0.5472,
+      "y": 1.5372,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03
+    },
+    {
+      "kind": "Box",
+      "x": -0.5472,
+      "y": 0.7272,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03
+    },
+    {
+      "kind": "Box",
+      "x": 0.5528,
+      "y": 2.3472,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03
+    },
+    {
+      "kind": "Box",
+      "x": 0.5528,
+      "y": 1.5372,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03
+    },
+    {
+      "kind": "Box",
+      "x": 0.5528,
+      "y": 0.7272,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03
+    },
+    {
+      "kind": "Image",
+      "x": 0.005,
+      "y": 1.135,
+      "w": 0.43,
+      "h": 0.43,
+      "rot": 0.0,
+      "texture": "img/canicas_logo.png"
+    }
   ]
 }

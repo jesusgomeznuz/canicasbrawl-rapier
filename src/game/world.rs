@@ -60,6 +60,7 @@ fn spawn_level(
         "zigzag", "spheres", "crosses", "zigzag", "spheres", "crosses", "zigzag", "spheres",
         "crosses", "zigzag", "spheres",
     ];
+    let module_gap = 0.1;
     let mut next_top = spawn_y;
     for name in modules {
         next_top = spawn_module(
@@ -70,7 +71,7 @@ fn spawn_level(
             asset_server,
             meshes,
             materials,
-        );
+        ) - module_gap;
     }
     let level_bottom = next_top - 0.5;
     spawn_floor(
@@ -94,76 +95,78 @@ fn spawn_module(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
 ) -> f32 {
-    let ModuleData { height, objects } = load_module(name);
-    let y_offset = level_top - height;
+    let ModuleData { objects, .. } = load_module(name);
+    let (y_min, y_max) = objects
+        .iter()
+        .map(|o| o.y_bounds())
+        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), (mn, mx)| {
+            (lo.min(mn), hi.max(mx))
+        });
+    let trimmed_height = y_max - y_min;
+    let y_offset = level_top - y_max;
     for obj in &objects {
-        let def = match obj {
+        match obj {
             WorldObject::Box {
-                x,
-                y,
-                hx,
-                hy,
-                rot,
-                angvel,
-                border_radius,
-            } => ObjectDef {
-                shape: ColliderShape::Box {
-                    hx: *hx,
-                    hy: *hy,
-                    hz: crate::UNIT / 4.0,
-                },
-                position: Vec3::new(*x, *y + y_offset, 0.0),
-                rotation: Quat::from_rotation_z(*rot),
-                body: if angvel != &[0.0; 3] {
-                    BodyType::Kinematic
-                } else {
-                    BodyType::Static
-                },
-                angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
-                visual: Some(VisualDef {
-                    border_radius: border_radius.or(Some(0.02)),
-                    ..VisualDef::white_matte()
-                }),
-                restitution: Some(0.05),
-                friction: Some(0.15),
-                ..Default::default()
-            },
-            WorldObject::Sphere { x, y, radius } => ObjectDef {
-                shape: ColliderShape::Sphere { radius: *radius },
-                position: Vec3::new(*x, *y + y_offset, 0.0),
-                body: BodyType::Static,
-                visual: Some(VisualDef::white_matte()),
-                restitution: Some(0.05),
-                friction: Some(0.15),
-                ..Default::default()
-            },
-            WorldObject::Mesh {
-                x,
-                y,
-                rot,
-                model_name,
-                angvel,
-            } => ObjectDef {
-                shape: ColliderShape::MeshObject {
-                    model_name: model_name.clone(),
-                },
-                position: Vec3::new(*x, *y + y_offset, 0.0),
-                rotation: Quat::from_rotation_z(*rot),
-                body: if angvel != &[0.0; 3] {
-                    BodyType::Kinematic
-                } else {
-                    BodyType::Static
-                },
-                angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
-                visual: Some(VisualDef::white_matte()),
-                restitution: Some(0.05),
-                friction: Some(0.15),
-                ..Default::default()
-            },
-        };
-        spawn_object(commands, def, mode, asset_server, meshes, materials);
+                x, y, hx, hy, rot, angvel, border_radius,
+            } => {
+                spawn_object(commands, ObjectDef {
+                    shape: ColliderShape::Box {
+                        hx: *hx, hy: *hy, hz: crate::UNIT / 4.0,
+                    },
+                    position: Vec3::new(*x, *y + y_offset, 0.0),
+                    rotation: Quat::from_rotation_z(*rot),
+                    body: if angvel != &[0.0; 3] { BodyType::Kinematic } else { BodyType::Static },
+                    angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
+                    visual: Some(VisualDef {
+                        border_radius: border_radius.or(Some(0.02)),
+                        ..VisualDef::white_matte()
+                    }),
+                    restitution: Some(0.05),
+                    friction: Some(0.15),
+                    ..Default::default()
+                }, mode, asset_server, meshes, materials);
+            }
+            WorldObject::Sphere { x, y, radius } => {
+                spawn_object(commands, ObjectDef {
+                    shape: ColliderShape::Sphere { radius: *radius },
+                    position: Vec3::new(*x, *y + y_offset, 0.0),
+                    body: BodyType::Static,
+                    visual: Some(VisualDef::white_matte()),
+                    restitution: Some(0.05),
+                    friction: Some(0.15),
+                    ..Default::default()
+                }, mode, asset_server, meshes, materials);
+            }
+            WorldObject::Mesh { x, y, rot, model_name, angvel } => {
+                spawn_object(commands, ObjectDef {
+                    shape: ColliderShape::MeshObject { model_name: model_name.clone() },
+                    position: Vec3::new(*x, *y + y_offset, 0.0),
+                    rotation: Quat::from_rotation_z(*rot),
+                    body: if angvel != &[0.0; 3] { BodyType::Kinematic } else { BodyType::Static },
+                    angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
+                    visual: Some(VisualDef::white_matte()),
+                    restitution: Some(0.05),
+                    friction: Some(0.15),
+                    ..Default::default()
+                }, mode, asset_server, meshes, materials);
+            }
+            WorldObject::Image { x, y, w, h, rot, texture } => {
+                let half_depth = crate::UNIT / 4.0;
+                commands.spawn((
+                    Mesh3d(meshes.add(Rectangle::new(*w, *h))),
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color_texture: Some(asset_server.load(texture.clone())),
+                        alpha_mode: AlphaMode::Blend,
+                        unlit: true,
+                        ..default()
+                    })),
+                    Transform::from_translation(Vec3::new(*x, *y + y_offset, half_depth + 0.001))
+                        .with_rotation(Quat::from_rotation_z(*rot)),
+                ));
+            }
+        }
     }
-    y_offset
+    level_top - trimmed_height
 }
 
 fn spawn_floor(

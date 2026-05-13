@@ -1,6 +1,8 @@
 use super::marbles::{Marble, MarbleLabel};
 use bevy::prelude::*;
+use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::render::camera::RenderTarget;
+use bevy::text::TextLayoutInfo;
 use rapier_bevy::OffscreenTarget;
 
 pub fn spawn_camera_and_lights(mut commands: Commands, offscreen: Option<Res<OffscreenTarget>>) {
@@ -16,6 +18,7 @@ pub fn spawn_camera_and_lights(mut commands: Commands, offscreen: Option<Res<Off
         .spawn((
             Camera3d::default(),
             cam3d,
+            Tonemapping::None,
             Transform::from_xyz(0.0, 13.0, 22.0).looking_at(Vec3::new(0.0, 12.0, 0.0), Vec3::Y),
         ))
         .with_children(|camera| {
@@ -60,6 +63,56 @@ pub fn camera_follows_lowest_marble(
 
     cam.translation = Vec3::new(0.0, lowest_y + camera_y_offset, camera_z);
     cam.rotation = Quat::IDENTITY;
+}
+
+#[derive(Component)]
+pub struct LeaderCrown;
+
+pub fn spawn_leader_crown(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut assets_loading: Option<ResMut<rapier_bevy::AssetsLoading>>,
+) {
+    let handle: Handle<Image> = asset_server.load("img/crown.png");
+    if let Some(al) = assets_loading.as_deref_mut() {
+        al.0.push(handle.clone().untyped());
+    }
+    commands.spawn((
+        Sprite {
+            image: handle,
+            custom_size: Some(Vec2::splat(28.0)),
+            ..default()
+        },
+        Transform::default(),
+        Visibility::Hidden,
+        LeaderCrown,
+    ));
+}
+
+pub fn update_leader_crown(
+    marbles: Query<(Entity, &Transform), With<Marble>>,
+    labels: Query<(&Transform, &TextLayoutInfo, &MarbleLabel), Without<LeaderCrown>>,
+    mut crown: Query<(&mut Transform, &mut Visibility), (With<LeaderCrown>, Without<Marble>, Without<MarbleLabel>)>,
+) {
+    let Ok((mut crown_t, mut crown_v)) = crown.single_mut() else { return };
+    let Some((leader, _)) = marbles
+        .iter()
+        .min_by(|(_, a), (_, b)| a.translation.y.partial_cmp(&b.translation.y).unwrap()) else {
+        *crown_v = Visibility::Hidden;
+        return;
+    };
+    let crown_size = 28.0_f32;
+    let gap = 6.0_f32;
+    for (label_t, layout, MarbleLabel(marble_entity)) in &labels {
+        if *marble_entity == leader {
+            crown_t.translation.x = label_t.translation.x - layout.size.x / 2.0 - crown_size / 2.0 - gap;
+            crown_t.translation.y = label_t.translation.y;
+            crown_t.translation.z = label_t.translation.z;
+            *crown_v = Visibility::Visible;
+            return;
+        }
+    }
+    *crown_v = Visibility::Hidden;
 }
 
 pub fn update_marble_labels(
