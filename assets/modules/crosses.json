@@ -12,7 +12,9 @@
         0.0,
         -1.5
       ],
-      "border_radius": 0.02
+      "border_radius": 0.02,
+      "friction": 0.2,
+      "restitution": 0.6
     },
     {
       "kind": "Box",
@@ -26,7 +28,9 @@
         0.0,
         -1.5
       ],
-      "border_radius": 0.02
+      "border_radius": 0.02,
+      "friction": 0.2,
+      "restitution": 0.6
     },
     {
       "kind": "Box",
@@ -40,7 +44,9 @@
         0.0,
         1.5
       ],
-      "border_radius": 0.02
+      "border_radius": 0.02,
+      "friction": 0.2,
+      "restitution": 0.6
     },
     {
       "kind": "Box",
@@ -54,7 +60,9 @@
         0.0,
         1.5
       ],
-      "border_radius": 0.02
+      "border_radius": 0.02,
+      "friction": 0.2,
+      "restitution": 0.6
     },
     {
       "kind": "Box",
@@ -68,7 +76,9 @@
         0.0,
         -1.5
       ],
-      "border_radius": 0.02
+      "border_radius": 0.02,
+      "friction": 0.2,
+      "restitution": 0.6
     },
     {
       "kind": "Box",
@@ -82,7 +92,9 @@
         0.0,
         -1.5
       ],
-      "border_radius": 0.02
+      "border_radius": 0.02,
+      "friction": 0.2,
+      "restitution": 0.6
     }
   ]
 }

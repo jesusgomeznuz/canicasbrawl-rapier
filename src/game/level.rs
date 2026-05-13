@@ -11,6 +11,8 @@ pub enum WorldObject {
         friction: Option<f32>,
         #[serde(default)]
         restitution: Option<f32>,
+        #[serde(default)]
+        bouncy: bool,
     },
     Sphere {
         x: f32, y: f32, radius: f32,
@@ -18,6 +20,8 @@ pub enum WorldObject {
         friction: Option<f32>,
         #[serde(default)]
         restitution: Option<f32>,
+        #[serde(default)]
+        bouncy: bool,
     },
     Mesh {
         x: f32, y: f32, rot: f32, model_name: String,

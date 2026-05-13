@@ -1,0 +1,44 @@
+{
+  "objects": [
+    {
+      "kind": "Box",
+      "x": 0.3131,
+      "y": 0.2272,
+      "hx": 0.375,
+      "hy": 0.03,
+      "rot": 0.3491,
+      "restitution": 1.0,
+      "bouncy": true
+    },
+    {
+      "kind": "Box",
+      "x": -0.4374,
+      "y": 0.5936,
+      "hx": 0.375,
+      "hy": 0.03,
+      "rot": -0.3491,
+      "restitution": 1.0,
+      "bouncy": true
+    },
+    {
+      "kind": "Box",
+      "x": 0.3131,
+      "y": 0.9872,
+      "hx": 0.375,
+      "hy": 0.03,
+      "rot": 0.3491,
+      "restitution": 1.0,
+      "bouncy": true
+    },
+    {
+      "kind": "Box",
+      "x": -0.4374,
+      "y": 1.3536,
+      "hx": 0.375,
+      "hy": 0.03,
+      "rot": -0.3491,
+      "restitution": 1.0,
+      "bouncy": true
+    }
+  ]
+}

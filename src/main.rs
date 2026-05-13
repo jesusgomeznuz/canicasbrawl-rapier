@@ -57,7 +57,12 @@ fn run_sim(mode: SimMode) {
             game::world::set_gravity,
         ),
     )
-    .add_systems(Update, production::voice_tracker::track_race_leader)
+    .add_systems(Update, (
+        production::voice_tracker::track_race_leader,
+        game::bouncy::trigger_bouncy_pulse,
+        game::bouncy::animate_bounce_pulse,
+        game::bouncy::tick_bounce_cooldown,
+    ))
     .add_systems(
         PostUpdate,
         game::camera::camera_follows_lowest_marble

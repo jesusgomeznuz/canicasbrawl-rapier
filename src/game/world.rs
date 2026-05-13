@@ -56,9 +56,26 @@ fn spawn_level(
 ) -> (f32, f32) {
     let spawn_y = 0.0;
     let modules = [
-        "crosses", "zigzag", "spheres", "toruses", "crosses", "zigzag", "spheres", "crosses",
-        "zigzag", "spheres", "crosses", "zigzag", "spheres", "crosses", "zigzag", "spheres",
-        "crosses", "zigzag", "spheres",
+        "crosses",
+        "zigzag",
+        "spheres",
+        "toruses",
+        "bouncy_walls",
+        "crosses",
+        "zigzag",
+        "spheres",
+        "crosses",
+        "zigzag",
+        "spheres",
+        "crosses",
+        "zigzag",
+        "spheres",
+        "crosses",
+        "zigzag",
+        "spheres",
+        "crosses",
+        "zigzag",
+        "spheres",
     ];
     let module_gap = 0.1;
     let mut next_top = spawn_y;
@@ -107,50 +124,126 @@ fn spawn_module(
     for obj in &objects {
         match obj {
             WorldObject::Box {
-                x, y, hx, hy, rot, angvel, border_radius, friction, restitution,
+                x,
+                y,
+                hx,
+                hy,
+                rot,
+                angvel,
+                border_radius,
+                friction,
+                restitution,
+                bouncy,
             } => {
-                spawn_object(commands, ObjectDef {
-                    shape: ColliderShape::Box {
-                        hx: *hx, hy: *hy, hz: crate::UNIT / 4.0,
+                let entity = spawn_object(
+                    commands,
+                    ObjectDef {
+                        shape: ColliderShape::Box {
+                            hx: *hx,
+                            hy: *hy,
+                            hz: crate::UNIT / 4.0,
+                        },
+                        position: Vec3::new(*x, *y + y_offset, 0.0),
+                        rotation: Quat::from_rotation_z(*rot),
+                        body: if angvel != &[0.0; 3] {
+                            BodyType::Kinematic
+                        } else {
+                            BodyType::Static
+                        },
+                        angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
+                        visual: Some(VisualDef {
+                            border_radius: *border_radius,
+                            ..VisualDef::white_matte()
+                        }),
+                        restitution: Some(restitution.unwrap_or(0.05)),
+                        friction: Some(friction.unwrap_or(0.15)),
+                        ..Default::default()
                     },
-                    position: Vec3::new(*x, *y + y_offset, 0.0),
-                    rotation: Quat::from_rotation_z(*rot),
-                    body: if angvel != &[0.0; 3] { BodyType::Kinematic } else { BodyType::Static },
-                    angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
-                    visual: Some(VisualDef {
-                        border_radius: *border_radius,
-                        ..VisualDef::white_matte()
-                    }),
-                    restitution: Some(restitution.unwrap_or(0.05)),
-                    friction: Some(friction.unwrap_or(0.15)),
-                    ..Default::default()
-                }, mode, asset_server, meshes, materials);
+                    mode,
+                    asset_server,
+                    meshes,
+                    materials,
+                );
+                if *bouncy {
+                    commands.entity(entity).insert((
+                        ActiveEvents::COLLISION_EVENTS,
+                        super::bouncy::BouncyOnContact,
+                    ));
+                }
             }
-            WorldObject::Sphere { x, y, radius, friction, restitution } => {
-                spawn_object(commands, ObjectDef {
-                    shape: ColliderShape::Sphere { radius: *radius },
-                    position: Vec3::new(*x, *y + y_offset, 0.0),
-                    body: BodyType::Static,
-                    visual: Some(VisualDef::white_matte()),
-                    restitution: Some(restitution.unwrap_or(0.05)),
-                    friction: Some(friction.unwrap_or(0.15)),
-                    ..Default::default()
-                }, mode, asset_server, meshes, materials);
+            WorldObject::Sphere {
+                x,
+                y,
+                radius,
+                friction,
+                restitution,
+                bouncy,
+            } => {
+                let entity = spawn_object(
+                    commands,
+                    ObjectDef {
+                        shape: ColliderShape::Sphere { radius: *radius },
+                        position: Vec3::new(*x, *y + y_offset, 0.0),
+                        body: BodyType::Static,
+                        visual: Some(VisualDef::white_matte()),
+                        restitution: Some(restitution.unwrap_or(0.05)),
+                        friction: Some(friction.unwrap_or(0.15)),
+                        ..Default::default()
+                    },
+                    mode,
+                    asset_server,
+                    meshes,
+                    materials,
+                );
+                if *bouncy {
+                    commands.entity(entity).insert((
+                        ActiveEvents::COLLISION_EVENTS,
+                        super::bouncy::BouncyOnContact,
+                    ));
+                }
             }
-            WorldObject::Mesh { x, y, rot, model_name, angvel, friction, restitution } => {
-                spawn_object(commands, ObjectDef {
-                    shape: ColliderShape::MeshObject { model_name: model_name.clone() },
-                    position: Vec3::new(*x, *y + y_offset, 0.0),
-                    rotation: Quat::from_rotation_z(*rot),
-                    body: if angvel != &[0.0; 3] { BodyType::Kinematic } else { BodyType::Static },
-                    angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
-                    visual: Some(VisualDef::white_matte()),
-                    restitution: Some(restitution.unwrap_or(0.05)),
-                    friction: Some(friction.unwrap_or(0.15)),
-                    ..Default::default()
-                }, mode, asset_server, meshes, materials);
+            WorldObject::Mesh {
+                x,
+                y,
+                rot,
+                model_name,
+                angvel,
+                friction,
+                restitution,
+            } => {
+                spawn_object(
+                    commands,
+                    ObjectDef {
+                        shape: ColliderShape::MeshObject {
+                            model_name: model_name.clone(),
+                        },
+                        position: Vec3::new(*x, *y + y_offset, 0.0),
+                        rotation: Quat::from_rotation_z(*rot),
+                        body: if angvel != &[0.0; 3] {
+                            BodyType::Kinematic
+                        } else {
+                            BodyType::Static
+                        },
+                        angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
+                        visual: Some(VisualDef::white_matte()),
+                        restitution: Some(restitution.unwrap_or(0.05)),
+                        friction: Some(friction.unwrap_or(0.15)),
+                        ..Default::default()
+                    },
+                    mode,
+                    asset_server,
+                    meshes,
+                    materials,
+                );
             }
-            WorldObject::Image { x, y, w, h, rot, texture } => {
+            WorldObject::Image {
+                x,
+                y,
+                w,
+                h,
+                rot,
+                texture,
+            } => {
                 let half_depth = crate::UNIT / 4.0;
                 commands.spawn((
                     Mesh3d(meshes.add(Rectangle::new(*w, *h))),

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use rapier_bevy::{
-    AssetsLoading, BodyType, ColliderShape, LockedAxes, ObjectDef, SimMode, VisualDef, spawn_object,
+    AssetsLoading, BodyType, ColliderShape, LockedAxes, ObjectDef, SimMode, spawn_object,
 };
 
 #[derive(Component)]

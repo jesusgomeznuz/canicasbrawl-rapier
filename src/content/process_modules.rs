@@ -25,6 +25,8 @@ enum WorldObject {
         friction: Option<f32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         restitution: Option<f32>,
+        #[serde(skip_serializing_if = "std::ops::Not::not")]
+        bouncy: bool,
     },
     Sphere {
         x: f32, y: f32, radius: f32,
@@ -32,6 +34,8 @@ enum WorldObject {
         friction: Option<f32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         restitution: Option<f32>,
+        #[serde(skip_serializing_if = "std::ops::Not::not")]
+        bouncy: bool,
     },
     Mesh   {
         x: f32, y: f32, rot: f32, model_name: String,
@@ -67,7 +71,7 @@ pub fn run() {
             .unwrap_or_else(|_| panic!("{} tiene formato inválido", path.display()));
 
         let (slug, frame_tags) = split_frame_name(&raw.frame);
-        let name = slug.to_lowercase();
+        let name = to_snake_case(slug);
         let module = transform(raw, &frame_tags);
 
         let out_path = out_dir.join(format!("{}.json", name));
@@ -92,6 +96,17 @@ fn transform(raw: RawModule, frame_tags: &str) -> ModuleData {
         })
         .collect();
     ModuleData { objects }
+}
+
+fn to_snake_case(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 4);
+    for (i, c) in s.chars().enumerate() {
+        if c.is_ascii_uppercase() && i > 0 {
+            out.push('_');
+        }
+        out.extend(c.to_lowercase());
+    }
+    out
 }
 
 fn split_frame_name(frame: &str) -> (&str, String) {
@@ -132,6 +147,7 @@ fn box_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {
         border_radius: optional_tag(&r.name, "|br"),
         friction: optional_tag(&r.name, "|fr"),
         restitution: optional_tag(&r.name, "|re"),
+        bouncy: r.name.contains("|bouncy"),
     }
 }
 
@@ -255,6 +271,7 @@ fn sphere_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {
         radius: round4(r.w / 2.0 * 0.01),
         friction: optional_tag(&r.name, "|fr"),
         restitution: optional_tag(&r.name, "|re"),
+        bouncy: r.name.contains("|bouncy"),
     }
 }
 
