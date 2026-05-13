@@ -257,6 +257,28 @@ fn spawn_module(
                         .with_rotation(Quat::from_rotation_z(*rot)),
                 ));
             }
+            WorldObject::Effect { x, y, w, h, rot, variant } => {
+                let entity = spawn_object(commands, ObjectDef {
+                    shape: ColliderShape::Box {
+                        hx: w / 2.0, hy: h / 2.0, hz: crate::UNIT / 4.0,
+                    },
+                    position: Vec3::new(*x, *y + y_offset, 0.0),
+                    rotation: Quat::from_rotation_z(*rot),
+                    body: BodyType::Static,
+                    sensor: true,
+                    visual: Some(VisualDef {
+                        appearance: rapier_bevy::VisualAppearance::Color(Color::srgba(0.4, 0.7, 1.0, 0.5)),
+                        ..VisualDef::white_matte()
+                    }),
+                    ..Default::default()
+                }, mode, asset_server, meshes, materials);
+                match variant.as_str() {
+                    "freeze" => { commands.entity(entity).insert(super::effects::FreezeEffect); }
+                    "shrink" => { commands.entity(entity).insert(super::effects::ShrinkEffect); }
+                    "swap"   => { commands.entity(entity).insert(super::effects::SwapEffect); }
+                    other => panic!("Variante de effect desconocida: '{}'", other),
+                }
+            }
         }
     }
     level_top - trimmed_height

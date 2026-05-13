@@ -62,6 +62,11 @@ fn run_sim(mode: SimMode) {
         game::bouncy::trigger_bouncy_pulse,
         game::bouncy::animate_bounce_pulse,
         game::bouncy::tick_bounce_cooldown,
+        game::effects::on_freeze_contact,
+        game::effects::try_unfreeze,
+        game::effects::on_shrink_contact,
+        game::effects::try_unshrink,
+        game::effects::on_swap_contact,
     ))
     .add_systems(
         PostUpdate,

@@ -134,6 +134,7 @@ fn spawn_marble_body(
                     | LockedAxes::ROTATION_LOCKED_Y,
             ),
             visual: None,
+            collision_groups: Some(super::effects::marble_groups()),
             ..Default::default()
         },
         mode,

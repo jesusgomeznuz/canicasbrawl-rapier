@@ -107,6 +107,24 @@
       "h": 0.43,
       "rot": 0.0,
       "texture": "img/canicas_logo.png"
+    },
+    {
+      "kind": "Effect",
+      "x": -0.24,
+      "y": 1.65,
+      "w": 0.04,
+      "h": 0.04,
+      "rot": 0.0,
+      "variant": "freeze"
+    },
+    {
+      "kind": "Effect",
+      "x": 0.45,
+      "y": 1.94,
+      "w": 0.04,
+      "h": 0.04,
+      "rot": 0.0,
+      "variant": "shrink"
     }
   ]
 }

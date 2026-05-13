@@ -35,6 +35,9 @@ pub enum WorldObject {
     Image {
         x: f32, y: f32, w: f32, h: f32, rot: f32, texture: String,
     },
+    Effect {
+        x: f32, y: f32, w: f32, h: f32, rot: f32, variant: String,
+    },
 }
 
 #[derive(serde::Deserialize)]
@@ -62,6 +65,10 @@ impl WorldObject {
                 (y - outer_r, y + outer_r)
             }
             WorldObject::Image { y, w, h, rot, .. } => {
+                let extent = (w * 0.5 * rot.sin()).abs() + (h * 0.5 * rot.cos()).abs();
+                (y - extent, y + extent)
+            }
+            WorldObject::Effect { y, w, h, rot, .. } => {
                 let extent = (w * 0.5 * rot.sin()).abs() + (h * 0.5 * rot.cos()).abs();
                 (y - extent, y + extent)
             }
