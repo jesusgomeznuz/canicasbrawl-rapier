@@ -52,8 +52,9 @@ pub fn run() {
         let raw: RawModule = serde_json::from_str(&json)
             .unwrap_or_else(|_| panic!("{} tiene formato inválido", path.display()));
 
-        let name = raw.frame.to_lowercase();
-        let module = transform(raw);
+        let (slug, frame_tags) = split_frame_name(&raw.frame);
+        let name = slug.to_lowercase();
+        let module = transform(raw, &frame_tags);
 
         let out_path = out_dir.join(format!("{}.json", name));
         let output = serde_json::to_string_pretty(&module).unwrap();
@@ -66,11 +67,24 @@ pub fn run() {
     }
 }
 
-fn transform(raw: RawModule) -> ModuleData {
+fn transform(raw: RawModule, frame_tags: &str) -> ModuleData {
     let objects = raw.rects.iter()
-        .map(|r| world_object_from_raw(r, raw.frame_w, raw.frame_h))
+        .map(|r| {
+            let merged = RawRect {
+                name: format!("{}{}", r.name, frame_tags),
+                x: r.x, y: r.y, w: r.w, h: r.h,
+            };
+            world_object_from_raw(&merged, raw.frame_w, raw.frame_h)
+        })
         .collect();
     ModuleData { objects }
+}
+
+fn split_frame_name(frame: &str) -> (&str, String) {
+    match frame.find('|') {
+        Some(i) => (&frame[..i], frame[i..].to_string()),
+        None    => (frame, String::new()),
+    }
 }
 
 fn world_object_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {

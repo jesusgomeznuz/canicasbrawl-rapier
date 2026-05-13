@@ -118,7 +118,7 @@ fn spawn_module(
                     body: if angvel != &[0.0; 3] { BodyType::Kinematic } else { BodyType::Static },
                     angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
                     visual: Some(VisualDef {
-                        border_radius: border_radius.or(Some(0.02)),
+                        border_radius: *border_radius,
                         ..VisualDef::white_matte()
                     }),
                     restitution: Some(0.05),

@@ -4,6 +4,7 @@ mod production;
 
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
+use bevy_rapier3d::plugin::PhysicsSet;
 use rapier_bevy::{GameAppConfig, SimMode, game_app, preprocess_assets};
 
 // Profundidad Z de canicas y plataformas — temporal mientras se calibran las físicas
@@ -56,12 +57,12 @@ fn run_sim(mode: SimMode) {
             game::world::set_gravity,
         ),
     )
+    .add_systems(Update, production::voice_tracker::track_race_leader)
     .add_systems(
-        Update,
-        (
-            game::camera::camera_follows_lowest_marble,
-            production::voice_tracker::track_race_leader,
-        ),
+        PostUpdate,
+        game::camera::camera_follows_lowest_marble
+            .after(PhysicsSet::Writeback)
+            .before(TransformSystem::TransformPropagate),
     )
     .add_systems(
         PostUpdate,
