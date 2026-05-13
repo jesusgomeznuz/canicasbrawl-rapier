@@ -1,5 +1,4 @@
 {
-  "height": 1.48,
   "objects": [
     {
       "kind": "Mesh",
@@ -9,9 +8,10 @@
       "model_name": "torus_R195_r80",
       "angvel": [
         0.0,
-        0.5,
+        0.4,
         0.0
-      ]
+      ],
+      "friction": 0.0
     },
     {
       "kind": "Mesh",
@@ -21,9 +21,10 @@
       "model_name": "torus_R195_r80",
       "angvel": [
         0.0,
-        -0.5,
+        -0.4,
         0.0
-      ]
+      ],
+      "friction": 0.0
     },
     {
       "kind": "Mesh",
@@ -33,9 +34,10 @@
       "model_name": "torus_R195_r80",
       "angvel": [
         0.0,
-        0.5,
+        0.4,
         0.0
-      ]
+      ],
+      "friction": 0.0
     },
     {
       "kind": "Mesh",
@@ -45,9 +47,10 @@
       "model_name": "torus_R195_r80",
       "angvel": [
         0.0,
-        -0.5,
+        -0.4,
         0.0
-      ]
+      ],
+      "friction": 0.0
     },
     {
       "kind": "Mesh",
@@ -57,9 +60,10 @@
       "model_name": "torus_R195_r80",
       "angvel": [
         0.0,
-        0.5,
+        0.4,
         0.0
-      ]
+      ],
+      "friction": 0.0
     }
   ]
 }

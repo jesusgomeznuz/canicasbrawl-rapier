@@ -124,9 +124,9 @@ fn spawn_marble_body(
             position: Vec3::new(x, y, 0.0),
             body: BodyType::Dynamic,
             restitution: Some(0.6),
-            friction: Some(0.4),
+            friction: Some(0.3),
             linear_damping: Some(0.15),
-            angular_damping: Some(0.4),
+            angular_damping: Some(0.9),
             ccd: true,
             locked_axes: Some(
                 LockedAxes::TRANSLATION_LOCKED_Z
@@ -162,47 +162,59 @@ fn build_marble_mesh(half_depth: f32, radius: f32, border: f32) -> Mesh {
     use bevy::render::mesh::{Indices, PrimitiveTopology};
 
     let n_radial = 48;
-    let n_arc    = 8;
+    let n_arc = 8;
     let z_back_inner = -half_depth + border;
     let r_inner = (radius - border).max(0.0);
 
-    let mut profile: Vec<(f32, f32)> = Vec::new();
-    profile.push((0.0, half_depth));
-    profile.push((radius, half_depth));
-    profile.push((radius, z_back_inner));
+    // (pr, pz, nr, nz) por ring. Misma posición con distinta normal crea un seam (filo nítido).
+    let mut rings: Vec<(f32, f32, f32, f32)> = Vec::new();
+    rings.push((0.0, half_depth, 0.0, 1.0));
+    rings.push((radius, half_depth, 0.0, 1.0));
+    rings.push((radius, half_depth, 1.0, 0.0));
+    rings.push((radius, z_back_inner, 1.0, 0.0));
     for i in 1..n_arc {
         let theta = std::f32::consts::FRAC_PI_2 * (i as f32) / (n_arc as f32);
         let (s, c) = theta.sin_cos();
-        profile.push((r_inner + border * c, z_back_inner - border * s));
+        rings.push((r_inner + border * c, z_back_inner - border * s, c, -s));
     }
-    profile.push((r_inner, -half_depth));
-    profile.push((0.0, -half_depth));
+    rings.push((r_inner, -half_depth, 0.0, -1.0));
+    rings.push((0.0, -half_depth, 0.0, -1.0));
 
     let mut positions: Vec<[f32; 3]> = Vec::new();
-    for &(pr, pz) in &profile {
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    for &(pr, pz, nr, nz) in &rings {
         for j in 0..n_radial {
             let phi = std::f32::consts::TAU * (j as f32) / (n_radial as f32);
             let (s, c) = phi.sin_cos();
             positions.push([pr * c, pr * s, pz]);
+            normals.push([nr * c, nr * s, nz]);
         }
     }
 
     let mut indices: Vec<u32> = Vec::new();
-    for i in 0..(profile.len() - 1) as u32 {
+    for i in 0..(rings.len() - 1) {
+        let (pr_a, pz_a, _, _) = rings[i];
+        let (pr_b, pz_b, _, _) = rings[i + 1];
+        if (pr_a - pr_b).abs() < 1e-6 && (pz_a - pz_b).abs() < 1e-6 {
+            continue;
+        }
         for j in 0..n_radial as u32 {
             let jn = (j + 1) % n_radial as u32;
-            let a = i       * n_radial as u32 + j;
-            let b = (i + 1) * n_radial as u32 + j;
-            let c = (i + 1) * n_radial as u32 + jn;
-            let d = i       * n_radial as u32 + jn;
+            let a = i as u32 * n_radial as u32 + j;
+            let b = (i as u32 + 1) * n_radial as u32 + j;
+            let c = (i as u32 + 1) * n_radial as u32 + jn;
+            let d = i as u32 * n_radial as u32 + jn;
             indices.extend_from_slice(&[a, b, c, a, c, d]);
         }
     }
 
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_indices(Indices::U32(indices));
-    mesh.compute_normals();
     mesh
 }
 

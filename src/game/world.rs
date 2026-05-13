@@ -107,7 +107,7 @@ fn spawn_module(
     for obj in &objects {
         match obj {
             WorldObject::Box {
-                x, y, hx, hy, rot, angvel, border_radius,
+                x, y, hx, hy, rot, angvel, border_radius, friction, restitution,
             } => {
                 spawn_object(commands, ObjectDef {
                     shape: ColliderShape::Box {
@@ -121,23 +121,23 @@ fn spawn_module(
                         border_radius: *border_radius,
                         ..VisualDef::white_matte()
                     }),
-                    restitution: Some(0.05),
-                    friction: Some(0.15),
+                    restitution: Some(restitution.unwrap_or(0.05)),
+                    friction: Some(friction.unwrap_or(0.15)),
                     ..Default::default()
                 }, mode, asset_server, meshes, materials);
             }
-            WorldObject::Sphere { x, y, radius } => {
+            WorldObject::Sphere { x, y, radius, friction, restitution } => {
                 spawn_object(commands, ObjectDef {
                     shape: ColliderShape::Sphere { radius: *radius },
                     position: Vec3::new(*x, *y + y_offset, 0.0),
                     body: BodyType::Static,
                     visual: Some(VisualDef::white_matte()),
-                    restitution: Some(0.05),
-                    friction: Some(0.15),
+                    restitution: Some(restitution.unwrap_or(0.05)),
+                    friction: Some(friction.unwrap_or(0.15)),
                     ..Default::default()
                 }, mode, asset_server, meshes, materials);
             }
-            WorldObject::Mesh { x, y, rot, model_name, angvel } => {
+            WorldObject::Mesh { x, y, rot, model_name, angvel, friction, restitution } => {
                 spawn_object(commands, ObjectDef {
                     shape: ColliderShape::MeshObject { model_name: model_name.clone() },
                     position: Vec3::new(*x, *y + y_offset, 0.0),
@@ -145,8 +145,8 @@ fn spawn_module(
                     body: if angvel != &[0.0; 3] { BodyType::Kinematic } else { BodyType::Static },
                     angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
                     visual: Some(VisualDef::white_matte()),
-                    restitution: Some(0.05),
-                    friction: Some(0.15),
+                    restitution: Some(restitution.unwrap_or(0.05)),
+                    friction: Some(friction.unwrap_or(0.15)),
                     ..Default::default()
                 }, mode, asset_server, meshes, materials);
             }

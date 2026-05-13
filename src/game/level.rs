@@ -7,12 +7,26 @@ pub enum WorldObject {
         angvel: [f32; 3],
         #[serde(default)]
         border_radius: Option<f32>,
+        #[serde(default)]
+        friction: Option<f32>,
+        #[serde(default)]
+        restitution: Option<f32>,
     },
-    Sphere { x: f32, y: f32, radius: f32 },
+    Sphere {
+        x: f32, y: f32, radius: f32,
+        #[serde(default)]
+        friction: Option<f32>,
+        #[serde(default)]
+        restitution: Option<f32>,
+    },
     Mesh {
         x: f32, y: f32, rot: f32, model_name: String,
         #[serde(default)]
         angvel: [f32; 3],
+        #[serde(default)]
+        friction: Option<f32>,
+        #[serde(default)]
+        restitution: Option<f32>,
     },
     Image {
         x: f32, y: f32, w: f32, h: f32, rot: f32, texture: String,

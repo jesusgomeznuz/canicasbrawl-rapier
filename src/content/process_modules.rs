@@ -21,12 +21,26 @@ enum WorldObject {
         angvel: [f32; 3],
         #[serde(skip_serializing_if = "Option::is_none")]
         border_radius: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        friction: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        restitution: Option<f32>,
     },
-    Sphere { x: f32, y: f32, radius: f32 },
+    Sphere {
+        x: f32, y: f32, radius: f32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        friction: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        restitution: Option<f32>,
+    },
     Mesh   {
         x: f32, y: f32, rot: f32, model_name: String,
         #[serde(skip_serializing_if = "is_zero_vec3")]
         angvel: [f32; 3],
+        #[serde(skip_serializing_if = "Option::is_none")]
+        friction: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        restitution: Option<f32>,
     },
     Image  { x: f32, y: f32, w: f32, h: f32, rot: f32, texture: String },
 }
@@ -88,7 +102,7 @@ fn split_frame_name(frame: &str) -> (&str, String) {
 }
 
 fn world_object_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {
-    match base_name(&r.name) {
+    match base_name(&r.name).as_str() {
         "sphere" => sphere_from_raw(r, frame_w, frame_h),
         "torus"  => torus_from_raw(r, frame_w, frame_h),
         "image"  => image_from_raw(r, frame_w, frame_h),
@@ -96,8 +110,8 @@ fn world_object_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject
     }
 }
 
-fn base_name(name: &str) -> &str {
-    name.split('|').next().unwrap_or(name).trim()
+fn base_name(name: &str) -> String {
+    name.split('|').next().unwrap_or(name).trim().to_lowercase()
 }
 
 fn box_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {
@@ -115,7 +129,9 @@ fn box_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {
         hy: round4(half_h * 0.01),
         rot: round4(rot),
         angvel: angvel_from_name(&r.name),
-        border_radius: br_from_name(&r.name),
+        border_radius: optional_tag(&r.name, "|br"),
+        friction: optional_tag(&r.name, "|fr"),
+        restitution: optional_tag(&r.name, "|re"),
     }
 }
 
@@ -143,6 +159,8 @@ fn torus_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {
         rot: round4(rot),
         model_name,
         angvel: angvel_from_name(&r.name),
+        friction: optional_tag(&r.name, "|fr"),
+        restitution: optional_tag(&r.name, "|re"),
     }
 }
 
@@ -235,6 +253,8 @@ fn sphere_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {
         x: round4((cx_figma - frame_w / 2.0) * 0.01),
         y: round4((frame_h - cy_figma)       * 0.01),
         radius: round4(r.w / 2.0 * 0.01),
+        friction: optional_tag(&r.name, "|fr"),
+        restitution: optional_tag(&r.name, "|re"),
     }
 }
 
@@ -250,9 +270,9 @@ fn angvel_from_name(name: &str) -> [f32; 3] {
     ]
 }
 
-fn br_from_name(name: &str) -> Option<f32> {
-    let start = name.find("|br")?;
-    let rest = &name[start + 3..];
+fn optional_tag(name: &str, tag: &str) -> Option<f32> {
+    let start = name.find(tag)?;
+    let rest = &name[start + tag.len()..];
     let end = rest.find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-')).unwrap_or(rest.len());
     rest[..end].parse::<f32>().ok()
 }

@@ -7,7 +7,9 @@
       "hx": 0.2,
       "hy": 0.2,
       "rot": 0.7854,
-      "border_radius": 0.03
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
     },
     {
       "kind": "Box",
@@ -16,7 +18,9 @@
       "hx": 0.2,
       "hy": 0.2,
       "rot": 0.7854,
-      "border_radius": 0.03
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
     },
     {
       "kind": "Box",
@@ -25,7 +29,9 @@
       "hx": 0.2,
       "hy": 0.2,
       "rot": 0.7854,
-      "border_radius": 0.03
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
     },
     {
       "kind": "Box",
@@ -34,7 +40,9 @@
       "hx": 0.2,
       "hy": 0.2,
       "rot": 0.7854,
-      "border_radius": 0.03
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
     },
     {
       "kind": "Box",
@@ -43,7 +51,9 @@
       "hx": 0.2,
       "hy": 0.2,
       "rot": 0.7854,
-      "border_radius": 0.03
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
     },
     {
       "kind": "Box",
@@ -52,7 +62,9 @@
       "hx": 0.2,
       "hy": 0.2,
       "rot": 0.7854,
-      "border_radius": 0.03
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
     },
     {
       "kind": "Box",
@@ -61,7 +73,9 @@
       "hx": 0.2,
       "hy": 0.2,
       "rot": 0.7854,
-      "border_radius": 0.03
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
     },
     {
       "kind": "Box",
@@ -70,7 +84,9 @@
       "hx": 0.2,
       "hy": 0.2,
       "rot": 0.7854,
-      "border_radius": 0.03
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
     },
     {
       "kind": "Box",
@@ -79,7 +95,9 @@
       "hx": 0.2,
       "hy": 0.2,
       "rot": 0.7854,
-      "border_radius": 0.03
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
     },
     {
       "kind": "Image",
