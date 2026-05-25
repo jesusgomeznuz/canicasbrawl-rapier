@@ -258,30 +258,83 @@ fn spawn_module(
                 ));
             }
             WorldObject::Effect { x, y, w, h, rot, variant } => {
-                let entity = spawn_object(commands, ObjectDef {
-                    shape: ColliderShape::Box {
-                        hx: w / 2.0, hy: h / 2.0, hz: crate::UNIT / 4.0,
-                    },
-                    position: Vec3::new(*x, *y + y_offset, 0.0),
-                    rotation: Quat::from_rotation_z(*rot),
-                    body: BodyType::Static,
-                    sensor: true,
-                    visual: Some(VisualDef {
-                        appearance: rapier_bevy::VisualAppearance::Color(Color::srgba(0.4, 0.7, 1.0, 0.5)),
-                        ..VisualDef::white_matte()
-                    }),
-                    ..Default::default()
-                }, mode, asset_server, meshes, materials);
-                match variant.as_str() {
-                    "freeze" => { commands.entity(entity).insert(super::effects::FreezeEffect); }
-                    "shrink" => { commands.entity(entity).insert(super::effects::ShrinkEffect); }
-                    "swap"   => { commands.entity(entity).insert(super::effects::SwapEffect); }
-                    other => panic!("Variante de effect desconocida: '{}'", other),
-                }
+                let position = Vec3::new(*x, *y + y_offset, 0.0);
+                let sensor = spawn_invisible_sensor(
+                    commands, position, *w, *h, *rot, mode, asset_server, meshes, materials,
+                );
+                attach_effect_marker(commands, sensor, variant);
+                spawn_spinning_icon(commands, asset_server, sensor, variant);
             }
         }
     }
     level_top - trimmed_height
+}
+
+fn spawn_invisible_sensor(
+    commands: &mut Commands,
+    position: Vec3,
+    w: f32,
+    h: f32,
+    rot: f32,
+    mode: &SimMode,
+    asset_server: &AssetServer,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+) -> Entity {
+    spawn_object(
+        commands,
+        ObjectDef {
+            shape: ColliderShape::Box {
+                hx: w / 2.0,
+                hy: h / 2.0,
+                hz: crate::UNIT / 4.0,
+            },
+            position,
+            rotation: Quat::from_rotation_z(rot),
+            body: BodyType::Static,
+            sensor: true,
+            visual: None,
+            ..Default::default()
+        },
+        mode,
+        asset_server,
+        meshes,
+        materials,
+    )
+}
+
+fn attach_effect_marker(commands: &mut Commands, sensor: Entity, variant: &str) {
+    match variant {
+        "freeze" => { commands.entity(sensor).insert(super::effects::FreezeEffect); }
+        "shrink" => { commands.entity(sensor).insert(super::effects::ShrinkEffect); }
+        "swap"   => { commands.entity(sensor).insert(super::effects::SwapEffect); }
+        other => panic!("Variante de effect desconocida: '{}'", other),
+    }
+}
+
+fn spawn_spinning_icon(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    sensor: Entity,
+    variant: &str,
+) {
+    let (axis, speed, scale) = icon_tuning_for(variant);
+    let scene = asset_server.load(format!("effects/{}.glb#Scene0", variant));
+    let icon = commands.spawn((
+        SceneRoot(scene),
+        Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::splat(scale)),
+        super::effects::SpinningIcon { axis, speed },
+    )).id();
+    commands.entity(sensor).add_child(icon);
+}
+
+fn icon_tuning_for(variant: &str) -> (Vec3, f32, f32) {
+    match variant {
+        "freeze" => (Vec3::Y, 1.0, 13.5),
+        "shrink" => (Vec3::Y, 1.0, 0.046),
+        "swap"   => (Vec3::Z, 2.0, 0.25),
+        _ => (Vec3::Y, 1.5, 0.05),
+    }
 }
 
 fn spawn_floor(

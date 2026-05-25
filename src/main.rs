@@ -67,6 +67,7 @@ fn run_sim(mode: SimMode) {
         game::effects::on_shrink_contact,
         game::effects::try_unshrink,
         game::effects::on_swap_contact,
+        game::effects::spin_icons,
     ))
     .add_systems(
         PostUpdate,
