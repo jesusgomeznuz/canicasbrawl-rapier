@@ -145,7 +145,7 @@ fn spawn_swap_rings(
     marble_b: Entity,
 ) {
     let lifetime = 1.5_f32;
-    let mesh = meshes.add(Torus { minor_radius: 0.012, major_radius: 0.13 });
+    let mesh = meshes.add(Torus { minor_radius: 0.010, major_radius: 0.10 });
     let joycon_red = Color::srgba(1.0, 0.235, 0.157, 1.0);
     let joycon_blue = Color::srgba(0.039, 0.725, 0.902, 1.0);
     let face_camera = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
