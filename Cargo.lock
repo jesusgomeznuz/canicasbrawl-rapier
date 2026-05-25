@@ -1549,6 +1549,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_rapier3d",
+ "rand",
  "rapier-bevy",
  "serde",
  "serde_json",

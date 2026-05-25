@@ -2,19 +2,28 @@ use super::level::{ModuleData, WorldObject, load_module};
 use bevy::prelude::*;
 use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
+use rand::Rng;
+use rand::seq::SliceRandom;
 use rapier_bevy::{
     AssetsLoading, BodyType, ColliderShape, ObjectDef, SimMode, VisualDef, spawn_object,
 };
 
+#[derive(Resource)]
+pub struct LevelSeed(pub u64);
+
 pub fn setup(
     mut commands: Commands,
     mode: Res<SimMode>,
+    seed: Res<LevelSeed>,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut assets_loading: Option<ResMut<AssetsLoading>>,
 ) {
     let (spawn_y, level_bottom) = spawn_level(
+        seed.0,
         &mut commands,
         &mode,
         &asset_server,
@@ -48,6 +57,7 @@ pub fn set_gravity(mut config: Query<&mut RapierConfiguration, With<DefaultRapie
 }
 
 fn spawn_level(
+    seed: u64,
     commands: &mut Commands,
     mode: &SimMode,
     asset_server: &AssetServer,
@@ -55,34 +65,15 @@ fn spawn_level(
     materials: &mut Assets<StandardMaterial>,
 ) -> (f32, f32) {
     let spawn_y = 0.0;
-    let modules = [
-        "crosses",
-        "zigzag",
-        "spheres",
-        "toruses",
-        "bouncy_walls",
-        "crosses",
-        "zigzag",
-        "spheres",
-        "crosses",
-        "zigzag",
-        "spheres",
-        "crosses",
-        "zigzag",
-        "spheres",
-        "crosses",
-        "zigzag",
-        "spheres",
-        "crosses",
-        "zigzag",
-        "spheres",
-    ];
+    let mut rng = SmallRng::seed_from_u64(seed);
+    let modules = shuffle_modules(&mut rng);
     let module_gap = 0.1;
     let mut next_top = spawn_y;
     for name in modules {
         next_top = spawn_module(
             name,
             next_top,
+            &mut rng,
             commands,
             mode,
             asset_server,
@@ -99,6 +90,14 @@ fn spawn_level(
         materials,
         level_bottom,
     );
+    super::finish::spawn_finish_line(
+        commands,
+        mode,
+        asset_server,
+        meshes,
+        materials,
+        level_bottom + 0.3,
+    );
 
     (spawn_y, level_bottom)
 }
@@ -106,6 +105,7 @@ fn spawn_level(
 fn spawn_module(
     name: &str,
     level_top: f32,
+    rng: &mut SmallRng,
     commands: &mut Commands,
     mode: &SimMode,
     asset_server: &AssetServer,
@@ -266,9 +266,53 @@ fn spawn_module(
                 attach_effect_marker(commands, sensor, variant);
                 spawn_spinning_icon(commands, asset_server, sensor, variant);
             }
+            WorldObject::EffectSlot { x, y, w, h, rot, options } => {
+                let position = Vec3::new(*x, *y + y_offset, 0.0);
+                let Some(variant) = resolve_slot_variant(options, position.y, rng) else { continue };
+                let sensor = spawn_invisible_sensor(
+                    commands, position, *w, *h, *rot, mode, asset_server, meshes, materials,
+                );
+                attach_effect_marker(commands, sensor, variant);
+                spawn_spinning_icon(commands, asset_server, sensor, variant);
+            }
         }
     }
     level_top - trimmed_height
+}
+
+fn shuffle_modules(rng: &mut SmallRng) -> Vec<&'static str> {
+    let pool: [&'static str; 5] = ["crosses", "zigzag", "spheres", "toruses", "bouncy_walls"];
+    let level_length = 20;
+    let mut last: Option<usize> = None;
+    (0..level_length).map(|_| {
+        loop {
+            let idx = rng.gen_range(0..pool.len());
+            if Some(idx) != last { last = Some(idx); break pool[idx]; }
+        }
+    }).collect()
+}
+
+fn all_sensor_variants() -> &'static [&'static str] {
+    &["freeze", "shrink", "swap"]
+}
+
+fn resolve_slot_variant<'a>(options: &'a [String], world_y: f32, rng: &mut SmallRng) -> Option<&'a str> {
+    let pool: Vec<&str> = if options.is_empty() {
+        all_sensor_variants().to_vec()
+    } else {
+        options.iter().map(|s| s.as_str()).collect()
+    };
+    let valid: Vec<&str> = pool.iter()
+        .copied()
+        .filter(|v| !should_skip_effect(v, world_y))
+        .collect();
+    valid.choose(rng).copied().map(|v| {
+        if options.is_empty() {
+            all_sensor_variants().iter().find(|s| **s == v).copied().unwrap_or(v)
+        } else {
+            options.iter().find(|s| s.as_str() == v).map(|s| s.as_str()).unwrap_or(v)
+        }
+    })
 }
 
 fn should_skip_effect(variant: &str, world_y: f32) -> bool {
