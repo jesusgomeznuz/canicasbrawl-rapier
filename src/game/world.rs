@@ -259,6 +259,7 @@ fn spawn_module(
             }
             WorldObject::Effect { x, y, w, h, rot, variant } => {
                 let position = Vec3::new(*x, *y + y_offset, 0.0);
+                if should_skip_effect(variant, position.y) { continue }
                 let sensor = spawn_invisible_sensor(
                     commands, position, *w, *h, *rot, mode, asset_server, meshes, materials,
                 );
@@ -268,6 +269,11 @@ fn spawn_module(
         }
     }
     level_top - trimmed_height
+}
+
+fn should_skip_effect(variant: &str, world_y: f32) -> bool {
+    let swap_block_above_y = -3.0_f32;
+    variant == "swap" && world_y > swap_block_above_y
 }
 
 fn spawn_invisible_sensor(
