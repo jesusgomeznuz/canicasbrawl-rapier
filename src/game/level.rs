@@ -38,6 +38,11 @@ pub enum WorldObject {
     Effect {
         x: f32, y: f32, w: f32, h: f32, rot: f32, variant: String,
     },
+    EffectSlot {
+        x: f32, y: f32, w: f32, h: f32, rot: f32,
+        #[serde(default)]
+        options: Vec<String>,
+    },
 }
 
 #[derive(serde::Deserialize)]
@@ -69,6 +74,10 @@ impl WorldObject {
                 (y - extent, y + extent)
             }
             WorldObject::Effect { y, w, h, rot, .. } => {
+                let extent = (w * 0.5 * rot.sin()).abs() + (h * 0.5 * rot.cos()).abs();
+                (y - extent, y + extent)
+            }
+            WorldObject::EffectSlot { y, w, h, rot, .. } => {
                 let extent = (w * 0.5 * rot.sin()).abs() + (h * 0.5 * rot.cos()).abs();
                 (y - extent, y + extent)
             }

@@ -13,7 +13,7 @@ pub(crate) const UNIT: f32 = 0.35;
 enum Command {
     ProcessModules,
     Preprocess,
-    Sim(SimMode),
+    Sim(SimMode, u64),
 }
 
 fn parse_command() -> Command {
@@ -24,21 +24,32 @@ fn parse_command() -> Command {
     if args.iter().any(|a| a == "--preprocess") {
         return Command::Preprocess;
     }
-    if args.iter().any(|a| a == "--sim-raw") {
-        return Command::Sim(SimMode::Raw);
-    }
-    Command::Sim(SimMode::Precomputed)
+    let mode = if args.iter().any(|a| a == "--sim-raw") { SimMode::Raw } else { SimMode::Precomputed };
+    Command::Sim(mode, parse_seed(&args))
+}
+
+fn parse_seed(args: &[String]) -> u64 {
+    args.iter().position(|a| a == "--seed")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_else(random_seed)
+}
+
+fn random_seed() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64
 }
 
 fn main() {
     match parse_command() {
         Command::ProcessModules => content::process_modules::run(),
         Command::Preprocess => preprocess_assets(),
-        Command::Sim(mode) => run_sim(mode),
+        Command::Sim(mode, seed) => run_sim(mode, seed),
     }
 }
 
-fn run_sim(mode: SimMode) {
+fn run_sim(mode: SimMode, seed: u64) {
+    println!("Level seed: {}", seed);
     game_app(
         mode,
         GameAppConfig {
@@ -48,6 +59,8 @@ fn run_sim(mode: SimMode) {
     )
     .insert_resource(ClearColor(Color::srgb(0.329, 0.765, 0.980)))
     .insert_resource(production::voice_tracker::VoiceTracker::default())
+    .insert_resource(game::finish::RaceResult::default())
+    .insert_resource(game::world::LevelSeed(seed))
     .add_systems(
         Startup,
         (
@@ -69,6 +82,7 @@ fn run_sim(mode: SimMode) {
         game::effects::on_swap_contact,
         game::effects::fade_swap_rings,
         game::effects::spin_icons,
+        game::finish::on_finish_contact,
     ))
     .add_systems(
         PostUpdate,

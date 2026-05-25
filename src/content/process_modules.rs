@@ -48,6 +48,11 @@ enum WorldObject {
     },
     Image  { x: f32, y: f32, w: f32, h: f32, rot: f32, texture: String },
     Effect { x: f32, y: f32, w: f32, h: f32, rot: f32, variant: String },
+    EffectSlot {
+        x: f32, y: f32, w: f32, h: f32, rot: f32,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        options: Vec<String>,
+    },
 }
 
 #[derive(serde::Serialize)]
@@ -123,6 +128,7 @@ fn world_object_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject
         "torus"  => torus_from_raw(r, frame_w, frame_h),
         "image"  => image_from_raw(r, frame_w, frame_h),
         "effect" => effect_from_raw(r, frame_w, frame_h),
+        "slot"   => slot_from_raw(r, frame_w, frame_h),
         _        => box_from_raw(r, frame_w, frame_h),
     }
 }
@@ -279,6 +285,26 @@ fn effect_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {
         h: round4(r.h * 0.01),
         rot: round4(rot),
         variant: variant.to_string(),
+    }
+}
+
+fn slot_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {
+    let rot = rot_from_name(&r.name).to_radians();
+    let half_w = r.w / 2.0;
+    let half_h = r.h / 2.0;
+    let (sin, cos) = rot.sin_cos();
+    let cx_figma = r.x + half_w * cos + half_h * sin;
+    let cy_figma = r.y - half_w * sin + half_h * cos;
+    let options: Vec<String> = r.name.split('|').nth(1)
+        .map(|s| s.split(',').map(|v| v.trim().to_string()).filter(|v| !v.is_empty()).collect())
+        .unwrap_or_default();
+    WorldObject::EffectSlot {
+        x: round4((cx_figma - frame_w / 2.0) * 0.01),
+        y: round4((frame_h - cy_figma)       * 0.01),
+        w: round4(r.w * 0.01),
+        h: round4(r.h * 0.01),
+        rot: round4(rot),
+        options,
     }
 }
 
