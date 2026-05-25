@@ -89,7 +89,7 @@ fn spawn_frozen_visual(
     let visual = commands.spawn((
         Mesh3d(meshes.add(Sphere::new(0.11))),
         MeshMaterial3d(materials.add(icy)),
-        Transform::default(),
+        Transform::from_xyz(0.0, 0.0, 0.12),
     )).id();
     commands.entity(marble).add_child(visual);
     visual
@@ -171,11 +171,11 @@ fn spawn_swap_rings(
 ) {
     let lifetime = 1.5_f32;
     let mesh = meshes.add(Torus { minor_radius: 0.010, major_radius: 0.10 });
-    let joycon_red = Color::srgba(1.0, 0.235, 0.157, 1.0);
-    let joycon_blue = Color::srgba(0.039, 0.725, 0.902, 1.0);
+    let purple = Color::srgba(0.7, 0.3, 0.95, 1.0);
     let face_camera = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
 
-    for (marble, color) in [(marble_a, joycon_red), (marble_b, joycon_blue)] {
+    for marble in [marble_a, marble_b] {
+        let color = purple;
         let material = materials.add(StandardMaterial {
             base_color: color,
             emissive: LinearRgba::from(color) * 2.0,

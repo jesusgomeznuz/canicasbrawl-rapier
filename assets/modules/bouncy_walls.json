@@ -7,6 +7,8 @@
       "hx": 0.375,
       "hy": 0.03,
       "rot": 0.3491,
+      "border_radius": 0.02,
+      "friction": 0.0,
       "restitution": 1.0,
       "bouncy": true
     },
@@ -17,6 +19,8 @@
       "hx": 0.375,
       "hy": 0.03,
       "rot": -0.3491,
+      "border_radius": 0.02,
+      "friction": 0.0,
       "restitution": 1.0,
       "bouncy": true
     },
@@ -27,6 +31,8 @@
       "hx": 0.375,
       "hy": 0.03,
       "rot": 0.3491,
+      "border_radius": 0.02,
+      "friction": 0.0,
       "restitution": 1.0,
       "bouncy": true
     },
@@ -37,6 +43,8 @@
       "hx": 0.375,
       "hy": 0.03,
       "rot": -0.3491,
+      "border_radius": 0.02,
+      "friction": 0.0,
       "restitution": 1.0,
       "bouncy": true
     }

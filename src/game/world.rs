@@ -2,9 +2,9 @@ use super::level::{ModuleData, WorldObject, load_module};
 use bevy::prelude::*;
 use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
+use rand::Rng;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
-use rand::Rng;
 use rand::seq::SliceRandom;
 use rapier_bevy::{
     AssetsLoading, BodyType, ColliderShape, ObjectDef, SimMode, VisualDef, spawn_object,
@@ -258,20 +258,54 @@ fn spawn_module(
                         .with_rotation(Quat::from_rotation_z(*rot)),
                 ));
             }
-            WorldObject::Effect { x, y, w, h, rot, variant } => {
+            WorldObject::Effect {
+                x,
+                y,
+                w,
+                h,
+                rot,
+                variant,
+            } => {
                 let position = Vec3::new(*x, *y + y_offset, 0.0);
-                if should_skip_effect(variant, position.y) { continue }
+                if should_skip_effect(variant, position.y) {
+                    continue;
+                }
                 let sensor = spawn_invisible_sensor(
-                    commands, position, *w, *h, *rot, mode, asset_server, meshes, materials,
+                    commands,
+                    position,
+                    *w,
+                    *h,
+                    *rot,
+                    mode,
+                    asset_server,
+                    meshes,
+                    materials,
                 );
                 attach_effect_marker(commands, sensor, variant);
                 spawn_spinning_icon(commands, asset_server, sensor, variant);
             }
-            WorldObject::EffectSlot { x, y, w, h, rot, options } => {
+            WorldObject::EffectSlot {
+                x,
+                y,
+                w,
+                h,
+                rot,
+                options,
+            } => {
                 let position = Vec3::new(*x, *y + y_offset, 0.0);
-                let Some(variant) = resolve_slot_variant(options, position.y, rng) else { continue };
+                let Some(variant) = resolve_slot_variant(options, position.y, rng) else {
+                    continue;
+                };
                 let sensor = spawn_invisible_sensor(
-                    commands, position, *w, *h, *rot, mode, asset_server, meshes, materials,
+                    commands,
+                    position,
+                    *w,
+                    *h,
+                    *rot,
+                    mode,
+                    asset_server,
+                    meshes,
+                    materials,
                 );
                 attach_effect_marker(commands, sensor, variant);
                 spawn_spinning_icon(commands, asset_server, sensor, variant);
@@ -282,36 +316,64 @@ fn spawn_module(
 }
 
 fn shuffle_modules(rng: &mut SmallRng) -> Vec<&'static str> {
-    let pool: [&'static str; 5] = ["crosses", "zigzag", "spheres", "toruses", "bouncy_walls"];
+    let pool: &[(&'static str, u32)] = &[
+        ("crosses", 3),
+        ("zigzag", 3),
+        ("spheres", 3),
+        ("toruses", 1),
+        ("bouncy_walls", 1),
+    ];
+    let weighted: Vec<&'static str> = pool
+        .iter()
+        .flat_map(|(name, weight)| std::iter::repeat(*name).take(*weight as usize))
+        .collect();
     let level_length = 20;
-    let mut last: Option<usize> = None;
-    (0..level_length).map(|_| {
-        loop {
-            let idx = rng.gen_range(0..pool.len());
-            if Some(idx) != last { last = Some(idx); break pool[idx]; }
-        }
-    }).collect()
+    let mut last: Option<&str> = None;
+    (0..level_length)
+        .map(|_| {
+            loop {
+                let pick = weighted[rng.gen_range(0..weighted.len())];
+                if Some(pick) != last {
+                    last = Some(pick);
+                    break pick;
+                }
+            }
+        })
+        .collect()
 }
 
 fn all_sensor_variants() -> &'static [&'static str] {
     &["freeze", "shrink", "swap"]
 }
 
-fn resolve_slot_variant<'a>(options: &'a [String], world_y: f32, rng: &mut SmallRng) -> Option<&'a str> {
+fn resolve_slot_variant<'a>(
+    options: &'a [String],
+    world_y: f32,
+    rng: &mut SmallRng,
+) -> Option<&'a str> {
     let pool: Vec<&str> = if options.is_empty() {
         all_sensor_variants().to_vec()
     } else {
         options.iter().map(|s| s.as_str()).collect()
     };
-    let valid: Vec<&str> = pool.iter()
+    let valid: Vec<&str> = pool
+        .iter()
         .copied()
         .filter(|v| !should_skip_effect(v, world_y))
         .collect();
     valid.choose(rng).copied().map(|v| {
         if options.is_empty() {
-            all_sensor_variants().iter().find(|s| **s == v).copied().unwrap_or(v)
+            all_sensor_variants()
+                .iter()
+                .find(|s| **s == v)
+                .copied()
+                .unwrap_or(v)
         } else {
-            options.iter().find(|s| s.as_str() == v).map(|s| s.as_str()).unwrap_or(v)
+            options
+                .iter()
+                .find(|s| s.as_str() == v)
+                .map(|s| s.as_str())
+                .unwrap_or(v)
         }
     })
 }
@@ -356,9 +418,15 @@ fn spawn_invisible_sensor(
 
 fn attach_effect_marker(commands: &mut Commands, sensor: Entity, variant: &str) {
     match variant {
-        "freeze" => { commands.entity(sensor).insert(super::effects::FreezeEffect); }
-        "shrink" => { commands.entity(sensor).insert(super::effects::ShrinkEffect); }
-        "swap"   => { commands.entity(sensor).insert(super::effects::SwapEffect); }
+        "freeze" => {
+            commands.entity(sensor).insert(super::effects::FreezeEffect);
+        }
+        "shrink" => {
+            commands.entity(sensor).insert(super::effects::ShrinkEffect);
+        }
+        "swap" => {
+            commands.entity(sensor).insert(super::effects::SwapEffect);
+        }
         other => panic!("Variante de effect desconocida: '{}'", other),
     }
 }
@@ -371,11 +439,13 @@ fn spawn_spinning_icon(
 ) {
     let (axis, speed, scale) = icon_tuning_for(variant);
     let scene = asset_server.load(format!("effects/{}.glb#Scene0", variant));
-    let icon = commands.spawn((
-        SceneRoot(scene),
-        Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::splat(scale)),
-        super::effects::SpinningIcon { axis, speed },
-    )).id();
+    let icon = commands
+        .spawn((
+            SceneRoot(scene),
+            Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::splat(scale)),
+            super::effects::SpinningIcon { axis, speed },
+        ))
+        .id();
     commands.entity(sensor).add_child(icon);
 }
 
@@ -383,7 +453,7 @@ fn icon_tuning_for(variant: &str) -> (Vec3, f32, f32) {
     match variant {
         "freeze" => (Vec3::Y, 1.0, 13.5),
         "shrink" => (Vec3::Y, 1.0, 0.046),
-        "swap"   => (Vec3::Z, 2.0, 0.25),
+        "swap" => (Vec3::Z, 2.0, 0.25),
         _ => (Vec3::Y, 1.5, 0.05),
     }
 }

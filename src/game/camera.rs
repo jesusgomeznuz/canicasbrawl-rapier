@@ -1,6 +1,6 @@
 use super::marbles::{Marble, MarbleLabel};
-use bevy::prelude::*;
 use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::prelude::*;
 use bevy::render::camera::RenderTarget;
 use bevy::text::TextLayoutInfo;
 use rapier_bevy::OffscreenTarget;
@@ -52,16 +52,31 @@ pub fn spawn_camera_and_lights(mut commands: Commands, offscreen: Option<Res<Off
 }
 
 pub fn camera_follows_lowest_marble(
+    time: Res<Time>,
     marbles: Query<&Transform, With<Marble>>,
     mut camera: Query<&mut Transform, (With<Camera3d>, Without<Marble>)>,
+    mut initialized: Local<bool>,
 ) {
     let camera_z = 2.5;
     let camera_y_offset = 0.2;
+    let sharpness = 8.0;
 
-    let Some(lowest_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else { return };
-    let Ok(mut cam) = camera.single_mut() else { return };
+    let Some(lowest_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else {
+        return;
+    };
+    let Ok(mut cam) = camera.single_mut() else {
+        return;
+    };
 
-    cam.translation = Vec3::new(0.0, lowest_y + camera_y_offset, camera_z);
+    let target_y = lowest_y + camera_y_offset;
+    let new_y = if !*initialized {
+        *initialized = true;
+        target_y
+    } else {
+        let alpha = 1.0 - (-time.delta_secs() * sharpness).exp();
+        cam.translation.y + (target_y - cam.translation.y) * alpha
+    };
+    cam.translation = Vec3::new(0.0, new_y, camera_z);
     cam.rotation = Quat::IDENTITY;
 }
 
@@ -92,12 +107,18 @@ pub fn spawn_leader_crown(
 pub fn update_leader_crown(
     marbles: Query<(Entity, &Transform), With<Marble>>,
     labels: Query<(&Transform, &TextLayoutInfo, &MarbleLabel), Without<LeaderCrown>>,
-    mut crown: Query<(&mut Transform, &mut Visibility), (With<LeaderCrown>, Without<Marble>, Without<MarbleLabel>)>,
+    mut crown: Query<
+        (&mut Transform, &mut Visibility),
+        (With<LeaderCrown>, Without<Marble>, Without<MarbleLabel>),
+    >,
 ) {
-    let Ok((mut crown_t, mut crown_v)) = crown.single_mut() else { return };
+    let Ok((mut crown_t, mut crown_v)) = crown.single_mut() else {
+        return;
+    };
     let Some((leader, _)) = marbles
         .iter()
-        .min_by(|(_, a), (_, b)| a.translation.y.partial_cmp(&b.translation.y).unwrap()) else {
+        .min_by(|(_, a), (_, b)| a.translation.y.partial_cmp(&b.translation.y).unwrap())
+    else {
         *crown_v = Visibility::Hidden;
         return;
     };
@@ -105,7 +126,8 @@ pub fn update_leader_crown(
     let gap = 6.0_f32;
     for (label_t, layout, MarbleLabel(marble_entity)) in &labels {
         if *marble_entity == leader {
-            crown_t.translation.x = label_t.translation.x - layout.size.x / 2.0 - crown_size / 2.0 - gap;
+            crown_t.translation.x =
+                label_t.translation.x - layout.size.x / 2.0 - crown_size / 2.0 - gap;
             crown_t.translation.y = label_t.translation.y;
             crown_t.translation.z = label_t.translation.z;
             *crown_v = Visibility::Visible;
@@ -116,8 +138,12 @@ pub fn update_leader_crown(
 }
 
 pub fn world_pos_on_screen(world_pos: Vec3, camera: &Camera, cam_xform: &GlobalTransform) -> bool {
-    let Ok(viewport) = camera.world_to_viewport(cam_xform, world_pos) else { return false };
-    let Some(size) = camera.logical_viewport_size() else { return false };
+    let Ok(viewport) = camera.world_to_viewport(cam_xform, world_pos) else {
+        return false;
+    };
+    let Some(size) = camera.logical_viewport_size() else {
+        return false;
+    };
     (0.0..=size.x).contains(&viewport.x) && (0.0..=size.y).contains(&viewport.y)
 }
 
@@ -126,13 +152,19 @@ pub fn update_marble_labels(
     mut labels: Query<(&mut Transform, &mut TextFont, &MarbleLabel)>,
     camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
-    let Ok((camera, cam_gt)) = camera_q.single() else { return };
-    let Some(viewport) = camera.logical_viewport_size() else { return };
+    let Ok((camera, cam_gt)) = camera_q.single() else {
+        return;
+    };
+    let Some(viewport) = camera.logical_viewport_size() else {
+        return;
+    };
     // 2.2% del alto del viewport → tamaño relativo igual en ventana y en --record
     let font_size = viewport.y * 0.022;
     for (mut transform, mut font, MarbleLabel(marble_entity)) in &mut labels {
         font.font_size = font_size;
-        let Ok(marble_gt) = marbles.get(*marble_entity) else { continue };
+        let Ok(marble_gt) = marbles.get(*marble_entity) else {
+            continue;
+        };
         let above = marble_gt.translation() + Vec3::Y * 0.13;
         if let Ok(screen_pos) = camera.world_to_viewport(cam_gt, above) {
             transform.translation.x = screen_pos.x - viewport.x / 2.0;
