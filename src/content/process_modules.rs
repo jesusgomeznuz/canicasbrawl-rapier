@@ -295,9 +295,7 @@ fn slot_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {
     let (sin, cos) = rot.sin_cos();
     let cx_figma = r.x + half_w * cos + half_h * sin;
     let cy_figma = r.y - half_w * sin + half_h * cos;
-    let options: Vec<String> = r.name.split('|').nth(1)
-        .map(|s| s.split(',').map(|v| v.trim().to_string()).filter(|v| !v.is_empty()).collect())
-        .unwrap_or_default();
+    let options = parse_slot_options(&r.name);
     WorldObject::EffectSlot {
         x: round4((cx_figma - frame_w / 2.0) * 0.01),
         y: round4((frame_h - cy_figma)       * 0.01),
@@ -305,6 +303,20 @@ fn slot_from_raw(r: &RawRect, frame_w: f32, frame_h: f32) -> WorldObject {
         h: round4(r.h * 0.01),
         rot: round4(rot),
         options,
+    }
+}
+
+fn parse_slot_options(name: &str) -> Vec<String> {
+    const SENSOR_VARIANTS: &[&str] = &["freeze", "shrink", "swap"];
+    let Some(first_tag) = name.split('|').nth(1) else { return vec![] };
+    let candidates: Vec<String> = first_tag.split(',')
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .collect();
+    if candidates.iter().all(|c| SENSOR_VARIANTS.contains(&c.as_str())) {
+        candidates
+    } else {
+        vec![]
     }
 }
 
