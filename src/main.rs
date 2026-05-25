@@ -59,6 +59,7 @@ fn run_sim(mode: SimMode, seed: u64) {
     )
     .insert_resource(ClearColor(Color::srgb(0.329, 0.765, 0.980)))
     .insert_resource(production::voice_tracker::VoiceTracker::default())
+    .insert_resource(production::stall_detector::StallDetector::default())
     .insert_resource(game::finish::RaceResult::default())
     .insert_resource(game::world::LevelSeed(seed))
     .add_systems(
@@ -72,6 +73,7 @@ fn run_sim(mode: SimMode, seed: u64) {
     )
     .add_systems(Update, (
         production::voice_tracker::track_race_leader,
+        production::stall_detector::detect_stall,
         game::bouncy::trigger_bouncy_pulse,
         game::bouncy::animate_bounce_pulse,
         game::bouncy::tick_bounce_cooldown,

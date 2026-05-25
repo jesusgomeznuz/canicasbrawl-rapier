@@ -65,10 +65,11 @@ fn spawn_level(
     materials: &mut Assets<StandardMaterial>,
 ) -> (f32, f32) {
     let spawn_y = 0.0;
+    let top_margin = 1.5;
     let mut rng = SmallRng::seed_from_u64(seed);
     let modules = shuffle_modules(&mut rng);
     let module_gap = 0.1;
-    let mut next_top = spawn_y;
+    let mut next_top = spawn_y - top_margin;
     for name in modules {
         next_top = spawn_module(
             name,
