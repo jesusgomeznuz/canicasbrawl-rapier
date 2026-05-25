@@ -115,6 +115,12 @@ pub fn update_leader_crown(
     *crown_v = Visibility::Hidden;
 }
 
+pub fn world_pos_on_screen(world_pos: Vec3, camera: &Camera, cam_xform: &GlobalTransform) -> bool {
+    let Ok(viewport) = camera.world_to_viewport(cam_xform, world_pos) else { return false };
+    let Some(size) = camera.logical_viewport_size() else { return false };
+    (0.0..=size.x).contains(&viewport.x) && (0.0..=size.y).contains(&viewport.y)
+}
+
 pub fn update_marble_labels(
     marbles: Query<&GlobalTransform, With<Marble>>,
     mut labels: Query<(&mut Transform, &mut TextFont, &MarbleLabel)>,
