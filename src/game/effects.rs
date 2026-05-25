@@ -19,6 +19,7 @@ pub struct FreezeEffect;
 #[derive(Component)]
 pub struct Frozen {
     pub expires_at: f32,
+    pub visual: Entity,
 }
 
 #[derive(Component)]
@@ -50,6 +51,8 @@ pub fn on_freeze_contact(
     marbles: Query<(), (With<Marble>, Without<Frozen>)>,
     camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     time: Res<Time>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     mut commands: Commands,
 ) {
     let duration = 2.0_f32;
@@ -60,14 +63,36 @@ pub fn on_freeze_contact(
             let Ok(sensor_xform) = freezes.get(sensor) else { continue };
             if !marbles.contains(target) { continue }
             if !super::camera::world_pos_on_screen(sensor_xform.translation, camera, cam_xform) { continue }
+            let visual = spawn_frozen_visual(&mut commands, &mut meshes, &mut materials, target);
             commands.entity(target).insert((
-                Frozen { expires_at: time.elapsed_secs() + duration },
+                Frozen { expires_at: time.elapsed_secs() + duration, visual },
                 RigidBody::KinematicPositionBased,
                 frozen_groups(),
             ));
             commands.entity(sensor).despawn();
         }
     }
+}
+
+fn spawn_frozen_visual(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    marble: Entity,
+) -> Entity {
+    let icy = StandardMaterial {
+        base_color: Color::srgba(0.65, 0.88, 1.0, 0.55),
+        emissive: LinearRgba::new(0.2, 0.45, 0.6, 1.0),
+        alpha_mode: AlphaMode::Blend,
+        ..default()
+    };
+    let visual = commands.spawn((
+        Mesh3d(meshes.add(Sphere::new(0.11))),
+        MeshMaterial3d(materials.add(icy)),
+        Transform::default(),
+    )).id();
+    commands.entity(marble).add_child(visual);
+    visual
 }
 
 pub fn on_shrink_contact(
@@ -241,6 +266,7 @@ pub fn try_unfreeze(
             },
         );
         if !blocked.get() {
+            commands.entity(f.visual).despawn();
             commands.entity(entity).insert((
                 RigidBody::Dynamic,
                 marble_groups(),
