@@ -1,4 +1,5 @@
 use super::level::{ModuleData, WorldObject, load_module};
+use super::marbles::Marble;
 use bevy::prelude::*;
 use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
@@ -13,37 +14,49 @@ use rapier_bevy::{
 #[derive(Resource)]
 pub struct LevelSeed(pub u64);
 
+/// Segundo de simulación en que se cierra el nivel con la finish line. Se deriva de la
+/// duración del video (`--record`) menos un margen, para que la meta se cruce unos
+/// segundos antes del final. Ver [`decide_level_action`].
+#[derive(Resource)]
+pub struct FinishTarget(pub f32);
+
 pub fn setup(
     mut commands: Commands,
     mode: Res<SimMode>,
     seed: Res<LevelSeed>,
+    finish_target: Res<FinishTarget>,
+    roster: Res<super::marbles::Roster>,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut assets_loading: Option<ResMut<AssetsLoading>>,
 ) {
-    let (spawn_y, level_bottom) = spawn_level(
-        seed.0,
+    let spawn_y = 0.0;
+    let top_margin = 1.5;
+    let walls_top = 2.0;
+    let first_module_top = spawn_y - top_margin;
+
+    // Paredes por tramo (sin border_radius para que no se vean las orillas/junturas);
+    // cada módulo añade su tramo en generate_level. Un mesh único de toda la columna
+    // reventaba el render por las sombras, así que se generan acotados al nivel visible.
+    spawn_wall_segment(
+        walls_top,
+        first_module_top,
         &mut commands,
         &mode,
         &asset_server,
         &mut meshes,
         &mut materials,
     );
-    spawn_side_walls(
-        level_bottom,
-        &mut commands,
-        &mode,
-        &asset_server,
-        &mut meshes,
-        &mut materials,
-    );
+    commands.insert_resource(LevelGen::new(seed.0, first_module_top, finish_target.0));
+
     super::marbles::spawn_marbles(
         &mut commands,
         &mode,
         &asset_server,
         &mut meshes,
         &mut materials,
+        &roster.0,
         0.0,
         spawn_y,
         &mut assets_loading,
@@ -56,51 +69,166 @@ pub fn set_gravity(mut config: Query<&mut RapierConfiguration, With<DefaultRapie
     }
 }
 
-fn spawn_level(
-    seed: u64,
-    commands: &mut Commands,
-    mode: &SimMode,
-    asset_server: &AssetServer,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
-) -> (f32, f32) {
-    let spawn_y = 0.0;
-    let top_margin = 1.5;
-    let mut rng = SmallRng::seed_from_u64(seed);
-    let modules = shuffle_modules(&mut rng);
-    let module_gap = 0.1;
-    let mut next_top = spawn_y - top_margin;
-    for name in modules {
-        next_top = spawn_module(
-            name,
-            next_top,
-            &mut rng,
-            commands,
-            mode,
-            asset_server,
-            meshes,
-            materials,
-        ) - module_gap;
-    }
-    let level_bottom = next_top - 0.5;
-    spawn_floor(
-        commands,
-        mode,
-        asset_server,
-        meshes,
-        materials,
-        level_bottom,
-    );
-    super::finish::spawn_finish_line(
-        commands,
-        mode,
-        asset_server,
-        meshes,
-        materials,
-        level_bottom + 0.3,
-    );
+/// Estado de la generación incremental del nivel. El nivel ya no se arma entero en
+/// Startup: `generate_level` añade módulos en runtime conforme baja la canica líder,
+/// y cierra con la finish line cuando el reloj se acerca al objetivo.
+#[derive(Resource)]
+pub struct LevelGen {
+    rng: SmallRng,
+    next_top: f32,
+    last_module: Option<&'static str>,
+    modules_spawned: u32,
+    finish_spawned: bool,
+    target_secs: f32,
+}
 
-    (spawn_y, level_bottom)
+impl LevelGen {
+    fn new(seed: u64, first_module_top: f32, target_secs: f32) -> Self {
+        Self {
+            rng: SmallRng::seed_from_u64(seed),
+            next_top: first_module_top,
+            last_module: None,
+            modules_spawned: 0,
+            finish_spawned: false,
+            target_secs,
+        }
+    }
+}
+
+enum LevelGenerationAction {
+    GenerateModule,
+    SpawnFinishLine,
+    DoNothing,
+}
+
+fn decide_level_action(
+    level_gen: &LevelGen,
+    leader_y: f32,
+    elapsed_secs: f32,
+) -> LevelGenerationAction {
+    if level_gen.finish_spawned {
+        return LevelGenerationAction::DoNothing;
+    }
+
+    // Temprano mejor que nunca: en cuanto se pasa el objetivo de tiempo se cierra el
+    // nivel poniendo la meta en el horizonte actual (el fondo de lo generado, así queda
+    // limpia al final) y se deja de generar. La líder cae el último tramo y la cruza.
+    if elapsed_secs >= level_gen.target_secs {
+        return LevelGenerationAction::SpawnFinishLine;
+    }
+
+    // Mientras haya tiempo, se mantiene pista por delante de la líder.
+    let trigger_distance = 3.0;
+    if leader_y - level_gen.next_top < trigger_distance {
+        return LevelGenerationAction::GenerateModule;
+    }
+    LevelGenerationAction::DoNothing
+}
+
+pub fn generate_level(
+    sim_time: Res<Time<Fixed>>,
+    marbles: Query<&Transform, With<Marble>>,
+    mut level_gen: ResMut<LevelGen>,
+    mut commands: Commands,
+    mode: Res<SimMode>,
+    asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let Some(leader_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else {
+        return;
+    };
+    match decide_level_action(&level_gen, leader_y, sim_time.elapsed_secs()) {
+        LevelGenerationAction::GenerateModule => {
+            let name = pick_module(&mut level_gen);
+            let module_gap = 0.1;
+            let top = level_gen.next_top;
+            let bottom = spawn_module(
+                name,
+                top,
+                &mut level_gen.rng,
+                &mut commands,
+                &mode,
+                &asset_server,
+                &mut meshes,
+                &mut materials,
+            ) - module_gap;
+            spawn_wall_segment(
+                top,
+                bottom,
+                &mut commands,
+                &mode,
+                &asset_server,
+                &mut meshes,
+                &mut materials,
+            );
+            level_gen.next_top = bottom;
+            level_gen.last_module = Some(name);
+            level_gen.modules_spawned += 1;
+        }
+        LevelGenerationAction::SpawnFinishLine => {
+            // La meta cierra el nivel en el horizonte (reemplaza el módulo que tocaría):
+            // la líder, ya cerca de él, cae los últimos metros y la cruza. Se deja un
+            // hueco antes de la meta (aire tras el último módulo) y otro debajo de ella
+            // (para ver caer la cola entre la meta y el suelo).
+            let gap_module_to_finish = 0.4;
+            let gap_finish_to_floor = 1.0;
+            let finish_y = level_gen.next_top - gap_module_to_finish;
+            let floor_y = finish_y - gap_finish_to_floor;
+            spawn_wall_segment(
+                level_gen.next_top,
+                floor_y,
+                &mut commands,
+                &mode,
+                &asset_server,
+                &mut meshes,
+                &mut materials,
+            );
+            spawn_floor(
+                &mut commands,
+                &mode,
+                &asset_server,
+                &mut meshes,
+                &mut materials,
+                floor_y,
+            );
+            super::finish::spawn_finish_line(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &asset_server,
+                finish_y,
+            );
+            level_gen.finish_spawned = true;
+        }
+        LevelGenerationAction::DoNothing => {}
+    }
+}
+
+/// Elige el siguiente módulo del pool ponderado, sin repetir el anterior. El primer
+/// módulo nunca es `spheres` (hoy atora las canicas al arrancar; regla de generación,
+/// no parche de la física del módulo).
+fn pick_module(level_gen: &mut LevelGen) -> &'static str {
+    let pool: &[(&'static str, u32)] = &[
+        ("crosses", 3),
+        ("zigzag", 3),
+        ("spheres", 3),
+        ("toruses", 1),
+        ("bouncy_walls", 1),
+    ];
+    let weighted: Vec<&'static str> = pool
+        .iter()
+        .flat_map(|(name, weight)| std::iter::repeat(*name).take(*weight as usize))
+        .collect();
+    let is_first_module = level_gen.modules_spawned == 0;
+    loop {
+        let pick = weighted[level_gen.rng.gen_range(0..weighted.len())];
+        let repeats_last = Some(pick) == level_gen.last_module;
+        let spheres_as_first = is_first_module && pick == "spheres";
+        if !repeats_last && !spheres_as_first {
+            return pick;
+        }
+    }
 }
 
 fn spawn_module(
@@ -315,33 +443,6 @@ fn spawn_module(
     level_top - trimmed_height
 }
 
-fn shuffle_modules(rng: &mut SmallRng) -> Vec<&'static str> {
-    let pool: &[(&'static str, u32)] = &[
-        ("crosses", 3),
-        ("zigzag", 3),
-        ("spheres", 3),
-        ("toruses", 1),
-        ("bouncy_walls", 1),
-    ];
-    let weighted: Vec<&'static str> = pool
-        .iter()
-        .flat_map(|(name, weight)| std::iter::repeat(*name).take(*weight as usize))
-        .collect();
-    let level_length = 20;
-    let mut last: Option<&str> = None;
-    (0..level_length)
-        .map(|_| {
-            loop {
-                let pick = weighted[rng.gen_range(0..weighted.len())];
-                if Some(pick) != last {
-                    last = Some(pick);
-                    break pick;
-                }
-            }
-        })
-        .collect()
-}
-
 fn all_sensor_variants() -> &'static [&'static str] {
     &["freeze", "shrink", "swap"]
 }
@@ -466,7 +567,10 @@ fn spawn_floor(
     materials: &mut Assets<StandardMaterial>,
     floor_y: f32,
 ) {
-    let hy = 0.03_f32;
+    // Grueso a propósito: las canicas llegan a ~20 m/s y un suelo delgado lo atraviesan
+    // (tunneling) aunque tengan CCD. Con varios metros de grosor se quedan dentro varios
+    // ticks y el solver las frena. El borde superior queda en floor_y.
+    let hy = 3.0_f32;
     spawn_object(
         commands,
         ObjectDef {
@@ -491,17 +595,17 @@ fn spawn_floor(
     );
 }
 
-fn spawn_side_walls(
-    level_bottom: f32,
+fn spawn_wall_segment(
+    top: f32,
+    bottom: f32,
     commands: &mut Commands,
     mode: &SimMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
 ) {
-    let top_y = 2.0; // margen sobre el spawn
-    let half_h = (top_y - level_bottom) / 2.0;
-    let center_y = (top_y + level_bottom) / 2.0;
+    let half_h = (top - bottom) / 2.0;
+    let center_y = (top + bottom) / 2.0;
     let half_width = 0.55;
     let wall_shape = ColliderShape::Box {
         hx: 0.05,
@@ -509,16 +613,15 @@ fn spawn_side_walls(
         hz: crate::UNIT / 4.0,
     };
 
+    // Sin border_radius: las esquinas redondeadas de cada tramo eran las orillas que
+    // delataban las junturas. Rectos y contiguos se ven como una pared continua.
     for x_sign in [-1.0_f32, 1.0] {
         spawn_object(
             commands,
             ObjectDef {
                 shape: wall_shape.clone(),
                 position: Vec3::new(x_sign * (half_width + 0.05), center_y, 0.0),
-                visual: Some(VisualDef {
-                    border_radius: Some(0.02),
-                    ..VisualDef::white_matte()
-                }),
+                visual: Some(VisualDef::white_matte()),
                 restitution: Some(0.05),
                 ..Default::default()
             },

@@ -7,14 +7,44 @@ use rapier_bevy::{
 pub struct Marble;
 
 #[derive(Component)]
-pub struct MarbleName(pub &'static str);
+pub struct MarbleName(pub String);
 
 #[derive(Component)]
 pub struct MarbleLabel(pub Entity);
 
 pub struct MarbleConfig {
-    pub nickname: &'static str,
-    pub image: &'static str,
+    pub nickname: String,
+    pub image: String,
+}
+
+/// Qué personajes corren esta carrera. Lo arma `build_roster` desde el CLI
+/// (`--characters`) y lo lee `world::setup` al spawnar las canicas.
+#[derive(Resource)]
+pub struct Roster(pub Vec<MarbleConfig>);
+
+/// Construye el roster a partir de los nombres pedidos por CLI (CamelCase canónico,
+/// mismos strings que se emiten como `leader` en voice_tracker.json). Sin nombres,
+/// devuelve el roster por defecto. Falla nombrando al personaje si le falta imagen.
+pub fn build_roster(characters: Option<Vec<String>>) -> Result<Vec<MarbleConfig>, String> {
+    let Some(names) = characters else { return Ok(default_roster()) };
+    if names.len() > 9 {
+        return Err(format!(
+            "Pediste {} personajes pero el grid de salida es 3×3 (máximo 9).",
+            names.len(),
+        ));
+    }
+    names.iter().map(|name| character_config(name)).collect()
+}
+
+fn character_config(name: &str) -> Result<MarbleConfig, String> {
+    let image = format!("characters/{}.png", name.to_lowercase());
+    if !std::path::Path::new("assets").join(&image).exists() {
+        return Err(format!(
+            "Personaje '{name}' sin imagen: falta assets/{image}. \
+             Revisa el nombre (CamelCase canónico) o agrega el asset.",
+        ));
+    }
+    Ok(MarbleConfig { nickname: name.to_string(), image })
 }
 
 pub fn spawn_marbles(
@@ -23,19 +53,19 @@ pub fn spawn_marbles(
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    roster: &[MarbleConfig],
     spawn_cx: f32,
     spawn_cy: f32,
     assets_loading: &mut Option<ResMut<AssetsLoading>>,
 ) {
-    let roster = marble_roster();
     let grid = spawn_grid(spawn_cx, spawn_cy);
     for (cfg, pos) in roster.iter().zip(grid.iter()) {
         let entity = spawn_marble_body(commands, mode, asset_server, meshes, materials, cfg, *pos);
-        spawn_marble_label(commands, entity, cfg.nickname);
+        spawn_marble_label(commands, entity, &cfg.nickname);
         attach_marble_face(
             commands,
             entity,
-            cfg.image,
+            &cfg.image,
             asset_server,
             meshes,
             materials,
@@ -44,45 +74,11 @@ pub fn spawn_marbles(
     }
 }
 
-fn marble_roster() -> Vec<MarbleConfig> {
-    vec![
-        MarbleConfig {
-            nickname: "Marceline",
-            image: "characters/marceline.png",
-        },
-        MarbleConfig {
-            nickname: "Perla",
-            image: "characters/perla.png",
-        },
-        MarbleConfig {
-            nickname: "Steven",
-            image: "characters/steven.png",
-        },
-        MarbleConfig {
-            nickname: "Wendy",
-            image: "characters/wendy.png",
-        },
-        MarbleConfig {
-            nickname: "Naruto",
-            image: "characters/naruto.png",
-        },
-        MarbleConfig {
-            nickname: "Ben10",
-            image: "characters/ben10.png",
-        },
-        MarbleConfig {
-            nickname: "Patricio",
-            image: "characters/patricio.png",
-        },
-        MarbleConfig {
-            nickname: "Finn",
-            image: "characters/finn.png",
-        },
-        MarbleConfig {
-            nickname: "Bart",
-            image: "characters/bart.png",
-        },
-    ]
+fn default_roster() -> Vec<MarbleConfig> {
+    ["Marceline", "Perla", "Steven", "Wendy", "Naruto", "Ben10", "Patricio", "Finn", "Bart"]
+        .iter()
+        .map(|name| character_config(name).expect("default roster asset missing"))
+        .collect()
 }
 
 fn spawn_grid(cx: f32, cy: f32) -> [(f32, f32); 9] {
@@ -153,7 +149,7 @@ fn spawn_marble_body(
         Mesh3d(body_mesh),
         MeshMaterial3d(body_material),
         Marble,
-        MarbleName(cfg.nickname),
+        MarbleName(cfg.nickname.clone()),
     ));
     entity
 }
@@ -219,7 +215,7 @@ fn build_marble_mesh(half_depth: f32, radius: f32, border: f32) -> Mesh {
     mesh
 }
 
-fn spawn_marble_label(commands: &mut Commands, marble_entity: Entity, nickname: &'static str) {
+fn spawn_marble_label(commands: &mut Commands, marble_entity: Entity, nickname: &str) {
     commands.spawn((
         Text2d::new(nickname),
         TextFont {
@@ -235,7 +231,7 @@ fn spawn_marble_label(commands: &mut Commands, marble_entity: Entity, nickname: 
 fn attach_marble_face(
     commands: &mut Commands,
     entity: Entity,
-    image_path: &'static str,
+    image_path: &str,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -247,7 +243,7 @@ fn attach_marble_face(
     let quad_z = half_depth;
 
     let bg_handle: Handle<Image> = asset_server.load("characters/circle_white.png");
-    let img_handle: Handle<Image> = asset_server.load(image_path);
+    let img_handle: Handle<Image> = asset_server.load(image_path.to_string());
 
     if let Some(al) = assets_loading.as_deref_mut() {
         al.0.push(bg_handle.clone().untyped());

@@ -91,7 +91,7 @@ main
 - Los archivos `.compound` son colisionadores VHACD precomputados que `build_collider` carga cuando `SimMode::Precomputed`; `SimMode::Raw` usa la geometría exacta del OBJ.
 - `engine::game_app(mode, config)` se encarga de DefaultPlugins, RapierPhysicsPlugin, FrameTimeDiagnostics, PhysicsStatsPlugin, RecordPlugin (si `--record`) y el debug renderer (si `--debug`). El juego compone su propio `Plugin` con `add_plugins`.
 - Cada juego pone su propia cámara, luces y `ClearColor`. Si necesita renderizar a `--record`, lee `Res<OffscreenTarget>` (recurso opcional inyectado por `RecordPlugin`).
-- El tiempo virtual en modo grabación corre a `SPEED` (50×) para generar simulaciones largas rápidamente.
+- La simulación corre en `FixedUpdate` a 60 steps/s (`TimestepMode::Fixed`, fijado en `engine.rs::game_app`). Toda la lógica de tiempo del juego vive en `FixedUpdate` para contar steps, no el wall-clock. En modo grabación, `RecordPlugin` usa `TimeUpdateStrategy::ManualDuration(1/60)`: cada frame avanza un step fijo y captura un frame de video (1 step = 1 frame), así la duración del MP4 == la del tiempo simulado. La aceleración de producción viene del loop headless (`run_loop(ZERO)`), no de un multiplicador de tiempo.
 
 ## Cómo extender modos
 

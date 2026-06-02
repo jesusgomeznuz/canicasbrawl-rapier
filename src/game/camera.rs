@@ -1,3 +1,4 @@
+use super::leader::RaceLeader;
 use super::marbles::{Marble, MarbleLabel};
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::prelude::*;
@@ -14,13 +15,13 @@ pub fn spawn_camera_and_lights(mut commands: Commands, offscreen: Option<Res<Off
     if let Some(ref t) = render_target {
         cam3d.target = t.clone();
     }
+    // Arranca ya en la pose de juego (misma que camera_follows_lowest_marble: z=2.5,
+    // mirando recto). La canica más baja descansa ~0.10 bajo el centro de spawn, así
+    // que la cámara nace ahí enmarcándola: sin el salto brusco del frame 0.
+    let lowest_marble_below_center = 0.10;
+    let start_pose = Transform::from_xyz(0.0, -lowest_marble_below_center, 2.5);
     commands
-        .spawn((
-            Camera3d::default(),
-            cam3d,
-            Tonemapping::None,
-            Transform::from_xyz(0.0, 13.0, 22.0).looking_at(Vec3::new(0.0, 12.0, 0.0), Vec3::Y),
-        ))
+        .spawn((Camera3d::default(), cam3d, Tonemapping::None, start_pose))
         .with_children(|camera| {
             camera.spawn((
                 DirectionalLight {
@@ -59,7 +60,7 @@ pub fn camera_follows_lowest_marble(
 ) {
     let camera_z = 2.5;
     let camera_y_offset = 0.2;
-    let sharpness = 8.0;
+    let sharpness = 10.0;
 
     let Some(lowest_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else {
         return;
@@ -105,27 +106,21 @@ pub fn spawn_leader_crown(
 }
 
 pub fn update_leader_crown(
-    marbles: Query<(Entity, &Transform), With<Marble>>,
+    leader: Res<RaceLeader>,
     labels: Query<(&Transform, &TextLayoutInfo, &MarbleLabel), Without<LeaderCrown>>,
-    mut crown: Query<
-        (&mut Transform, &mut Visibility),
-        (With<LeaderCrown>, Without<Marble>, Without<MarbleLabel>),
-    >,
+    mut crown: Query<(&mut Transform, &mut Visibility), (With<LeaderCrown>, Without<MarbleLabel>)>,
 ) {
     let Ok((mut crown_t, mut crown_v)) = crown.single_mut() else {
         return;
     };
-    let Some((leader, _)) = marbles
-        .iter()
-        .min_by(|(_, a), (_, b)| a.translation.y.partial_cmp(&b.translation.y).unwrap())
-    else {
+    let Some(leader_marble) = leader.marble else {
         *crown_v = Visibility::Hidden;
         return;
     };
     let crown_size = 28.0_f32;
     let gap = 6.0_f32;
     for (label_t, layout, MarbleLabel(marble_entity)) in &labels {
-        if *marble_entity == leader {
+        if *marble_entity == leader_marble {
             crown_t.translation.x =
                 label_t.translation.x - layout.size.x / 2.0 - crown_size / 2.0 - gap;
             crown_t.translation.y = label_t.translation.y;

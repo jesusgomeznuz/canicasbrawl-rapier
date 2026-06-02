@@ -6,13 +6,13 @@ Diagramas vivos. Cuando el código cambie, corre `/update-flow` y Claude actuali
 
 ```mermaid
 flowchart TD
-    Start([cargo run]) --> Parse["parse_command()"]
+    Start([cargo run]) --> Parse["parse_command()<br/>--process-modules / --preprocess<br/>--sim-raw / --seed N<br/>--characters N1,N2,... / --record T"]
     Parse --> Match{match Command}
     Match -- ProcessModules --> Content["content::process_modules::run()"]
     Match -- Preprocess --> Pre["preprocess_assets"]
-    Match -- Sim --> Sim["run_sim(mode)"]
+    Match -- Sim --> Sim["run_sim(mode, seed)"]
 
-    Sim --> SimDetail["game_app + GameAppConfig<br/>━━━━━━━━━━━━━<br/>insert ClearColor<br/>insert VoiceTracker<br/>━━━━━━━━━━━━━<br/>Startup:<br/>• camera::spawn_camera_and_lights<br/>• world::setup<br/>• world::set_gravity<br/>━━━━━━━━━━━━━<br/>Update:<br/>• camera::camera_follows_lowest_marble<br/>• voice_tracker::track_race_leader<br/>━━━━━━━━━━━━━<br/>PostUpdate:<br/>• camera::update_marble_labels<br/>━━━━━━━━━━━━━<br/>Last:<br/>• voice_tracker::save_voice_tracker_on_exit"]
+    Sim --> SimDetail["game_app + GameAppConfig<br/>━━━━━━━━━━━━━<br/>insert ClearColor<br/>insert VoiceTracker<br/>insert StallDetector<br/>insert RaceResult<br/>insert LevelSeed<br/>━━━━━━━━━━━━━<br/>Startup:<br/>• camera::spawn_camera_and_lights<br/>• camera::spawn_leader_crown<br/>• world::setup<br/>• world::set_gravity<br/>━━━━━━━━━━━━━<br/>FixedUpdate (60 steps/s, after Writeback):<br/>• effects::freeze / shrink / swap (contactos)<br/>• finish::on_finish_contact<br/>• effects::unfreeze / unshrink / fade_swap_rings<br/>• effects::spin_icons<br/>• bouncy::trigger / animate / cooldown<br/>• voice_tracker::track_race_leader<br/>• camera::camera_follows_lowest_marble<br/>━━━━━━━━━━━━━<br/>Update (wall-clock):<br/>• stall_detector::detect_stall<br/>━━━━━━━━━━━━━<br/>PostUpdate (after TransformPropagate):<br/>• camera::update_marble_labels<br/>• camera::update_leader_crown<br/>━━━━━━━━━━━━━<br/>Last:<br/>• voice_tracker::save_voice_tracker_on_exit"]
 
     Content --> End([exit])
     Pre --> End
@@ -82,13 +82,21 @@ flowchart TD
     main --> world[game/world.rs<br/>setup, set_gravity<br/>spawn_level, paredes, suelo]
     main --> marbles[game/marbles.rs<br/>spawn_marbles<br/>MarbleName, MarbleLabel]
     main --> camera[game/camera.rs<br/>spawn_camera_and_lights<br/>follow_lowest, update_labels]
+    main --> bouncy[game/bouncy.rs<br/>BouncyOnContact + pulse/cooldown]
+    main --> effects[game/effects.rs<br/>freeze / shrink / swap<br/>collision groups]
+    main --> finish[game/finish.rs<br/>FinishLine + RaceResult]
     main --> tracker[production/voice_tracker.rs<br/>track_race_leader<br/>save_on_exit]
+    main --> stall[production/stall_detector.rs<br/>detect_stall: frames patológicos del solver → AppExit]
     main --> content[content/process_modules.rs<br/>raw JSON → final JSON]
     main -->|Sim, Preprocess| engine[(rapier-bevy<br/>game_app, world_objects,<br/>RecordPlugin, OffscreenTarget)]
     world --> level[game/level.rs<br/>load_module → ModuleData]
     world --> marbles
+    world --> finish
     camera --> marbles
     tracker --> marbles
+    effects --> marbles
+    bouncy --> marbles
+    finish --> marbles
     level -->|lee| ModulesJSON[(assets/modules/*.json)]
 ```
 

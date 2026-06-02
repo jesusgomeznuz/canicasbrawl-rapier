@@ -1,13 +1,14 @@
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
-use rapier_bevy::{
-    BodyType, ColliderShape, ObjectDef, SimMode, VisualAppearance, VisualDef, spawn_object,
-};
 
 use super::marbles::{Marble, MarbleName};
 
 #[derive(Component)]
 pub struct FinishLine;
+
+/// Altura de la meta. El cruce se detecta comparando la Y de cada canica con esta línea
+/// (no con un sensor físico), así no hay tunneling por más rápido que caiga la canica.
+#[derive(Resource, Default)]
+pub struct FinishLineY(pub Option<f32>);
 
 #[derive(Resource, Default)]
 pub struct RaceResult {
@@ -16,58 +17,52 @@ pub struct RaceResult {
 
 pub fn spawn_finish_line(
     commands: &mut Commands,
-    mode: &SimMode,
-    asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    asset_server: &AssetServer,
     y: f32,
 ) {
-    let entity = spawn_object(
-        commands,
-        ObjectDef {
-            shape: ColliderShape::Box {
-                hx: 0.55,
-                hy: 0.025,
-                hz: crate::UNIT / 4.0,
-            },
-            position: Vec3::new(0.0, y, 0.0),
-            body: BodyType::Static,
-            sensor: true,
-            visual: Some(VisualDef {
-                appearance: VisualAppearance::Color(Color::srgb(1.0, 0.85, 0.1)),
-                ..VisualDef::white_matte()
-            }),
-            ..Default::default()
-        },
-        mode,
-        asset_server,
-        meshes,
-        materials,
-    );
-    commands.entity(entity).insert((FinishLine, ActiveEvents::COLLISION_EVENTS));
+    // Quad vertical con la bandera de meta a cuadros, mirando a la cámara (plano XY,
+    // normal +Z). Solo es visual: el cruce lo decide `check_finish_crossing` por la Y,
+    // no por física. Banda delgada, pegada al frente de las paredes (su cara delantera
+    // está en z = +UNIT/4), no en medio de la profundidad.
+    let width = 1.1;
+    let height = 0.14;
+    let z_front = crate::UNIT / 4.0;
+    commands.spawn((
+        Mesh3d(meshes.add(Rectangle::new(width, height))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color_texture: Some(asset_server.load("img/finish.png")),
+            unlit: true,
+            ..default()
+        })),
+        Transform::from_xyz(0.0, y, z_front),
+        FinishLine,
+    ));
+    commands.insert_resource(FinishLineY(Some(y)));
 }
 
-pub fn on_finish_contact(
-    mut events: EventReader<CollisionEvent>,
-    finish: Query<(), With<FinishLine>>,
-    marbles: Query<&MarbleName, With<Marble>>,
-    time: Res<Time>,
+pub fn check_finish_crossing(
+    finish_y: Res<FinishLineY>,
+    marbles: Query<(Entity, &Transform, &MarbleName), With<Marble>>,
+    time: Res<Time<Fixed>>,
     mut result: ResMut<RaceResult>,
 ) {
-    for event in events.read() {
-        let CollisionEvent::Started(a, b, _) = event else { continue };
-        for (sensor, target) in [(*a, *b), (*b, *a)] {
-            if !finish.contains(sensor) { continue }
-            let Ok(name) = marbles.get(target) else { continue };
-            if result.finishers.iter().any(|(e, _)| *e == target) { continue }
-            let t = time.elapsed_secs();
-            result.finishers.push((target, t));
-            let position = result.finishers.len();
-            if position == 1 {
-                info!("🏁 WINNER: {} at {:.2}s", name.0, t);
-            } else {
-                info!("   #{} {} at {:.2}s", position, name.0, t);
-            }
+    let Some(y) = finish_y.0 else { return };
+    for (entity, transform, name) in &marbles {
+        if transform.translation.y > y {
+            continue;
+        }
+        if result.finishers.iter().any(|(e, _)| *e == entity) {
+            continue;
+        }
+        let t = time.elapsed_secs();
+        result.finishers.push((entity, t));
+        let position = result.finishers.len();
+        if position == 1 {
+            info!("🏁 WINNER: {} at {:.2}s", name.0, t);
+        } else {
+            info!("   #{} {} at {:.2}s", position, name.0, t);
         }
     }
 }

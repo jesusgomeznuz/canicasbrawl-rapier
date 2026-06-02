@@ -1,11 +1,9 @@
 use bevy::app::AppExit;
-use bevy::diagnostic::FrameCount;
 use bevy::prelude::*;
+use crate::game::leader::RaceLeader;
 use crate::game::marbles::{Marble, MarbleName};
 use serde::Serialize;
 use std::fs;
-
-const VIDEO_FPS: f32 = 60.0;
 
 #[derive(Serialize)]
 pub struct RaceSegment {
@@ -46,35 +44,30 @@ struct VoiceTrackerJson<'a> {
     segments: &'a [RaceSegment],
 }
 
+/// Abre un segmento de voz nuevo cada vez que cambia el líder de la carrera. Quién es
+/// el líder lo decide [`RaceLeader`]; aquí solo se traduce a segmentos con timestamps.
 pub fn track_race_leader(
-    marbles: Query<(&Transform, &MarbleName), With<Marble>>,
-    frame: Res<FrameCount>,
+    leader: Res<RaceLeader>,
+    names: Query<&MarbleName, With<Marble>>,
+    sim_time: Res<Time<Fixed>>,
     mut tracker: ResMut<VoiceTracker>,
 ) {
-    let Some(leader) = find_leader(&marbles) else { return };
-    if tracker.leader_changed(leader) {
-        let video_secs = frame.0 as f32 / VIDEO_FPS;
-        tracker.close_current_segment(video_secs);
-        tracker.open_new_segment(leader.to_string(), video_secs);
+    let Some(marble) = leader.marble else { return };
+    let Ok(name) = names.get(marble) else { return };
+    if tracker.leader_changed(&name.0) {
+        let now = sim_time.elapsed_secs();
+        tracker.close_current_segment(now);
+        tracker.open_new_segment(name.0.clone(), now);
     }
-}
-
-fn find_leader<'w, 's>(
-    marbles: &Query<'w, 's, (&Transform, &MarbleName), With<Marble>>,
-) -> Option<&'static str> {
-    marbles
-        .iter()
-        .min_by(|(a, _), (b, _)| a.translation.y.partial_cmp(&b.translation.y).unwrap())
-        .map(|(_, name)| name.0)
 }
 
 pub fn save_voice_tracker_on_exit(
     mut exit_events: EventReader<AppExit>,
-    frame: Res<FrameCount>,
+    sim_time: Res<Time<Fixed>>,
     mut tracker: ResMut<VoiceTracker>,
 ) {
     for _ in exit_events.read() {
-        tracker.close_current_segment(frame.0 as f32 / VIDEO_FPS);
+        tracker.close_current_segment(sim_time.elapsed_secs());
         write_voice_tracker_json(&tracker.segments);
     }
 }

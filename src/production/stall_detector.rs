@@ -1,40 +1,40 @@
 use bevy::app::AppExit;
 use bevy::prelude::*;
-
-use crate::game::marbles::Marble;
+use std::time::Instant;
 
 #[derive(Resource, Default)]
 pub struct StallDetector {
-    last_lowest_y: Option<f32>,
-    last_progress_secs: Option<f32>,
+    last_frame_at: Option<Instant>,
+    consecutive_slow_frames: u32,
 }
 
 pub fn detect_stall(
-    time: Res<Time>,
-    marbles: Query<&Transform, With<Marble>>,
     mut detector: ResMut<StallDetector>,
     mut exit: EventWriter<AppExit>,
 ) {
-    let stall_timeout = 5.0_f32;
-    let progress_epsilon = 0.05_f32;
+    let slow_frame_threshold_secs = 0.5_f32;
+    let max_consecutive_slow_frames = 5_u32;
 
-    let Some(lowest_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else { return };
-    let now = time.elapsed_secs();
+    // Wall-time real entre frames, medido con Instant: en --record el tiempo virtual
+    // avanza en pasos fijos (ManualDuration), así que Time<Real> no sirve para esto.
+    let now = Instant::now();
+    let Some(last_frame_at) = detector.last_frame_at.replace(now) else { return };
+    let frame_secs = now.duration_since(last_frame_at).as_secs_f32();
+    let frame_is_pathological = frame_secs > slow_frame_threshold_secs;
 
-    let made_progress = match detector.last_lowest_y {
-        Some(previous) => lowest_y < previous - progress_epsilon,
-        None => true,
-    };
-
-    if made_progress {
-        detector.last_lowest_y = Some(lowest_y);
-        detector.last_progress_secs = Some(now);
+    if frame_is_pathological {
+        detector.consecutive_slow_frames += 1;
+    } else {
+        detector.consecutive_slow_frames = 0;
         return;
     }
 
-    let Some(last_progress) = detector.last_progress_secs else { return };
-    if now - last_progress > stall_timeout {
-        warn!("Stall detectado — sin progreso en {:.1}s, cerrando", stall_timeout);
+    if detector.consecutive_slow_frames >= max_consecutive_slow_frames {
+        warn!(
+            "Solver atascado — {} frames seguidos > {:.0}ms reales, cerrando para no trabar la máquina",
+            detector.consecutive_slow_frames,
+            slow_frame_threshold_secs * 1000.0,
+        );
         exit.write(AppExit::Success);
     }
 }
