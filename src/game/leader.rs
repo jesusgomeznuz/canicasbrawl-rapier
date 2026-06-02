@@ -48,13 +48,7 @@ pub fn update_race_leader(
         return;
     }
 
-    // Un retador solo le quita el liderazgo a la canica de adelante si le saca este
-    // margen y lo sostiene este tiempo. Evita el parpadeo del arranque, cuando todas
-    // caen casi a la misma altura.
-    let lead_margin = 0.2;
-    let min_lead_secs = 0.5;
     let now = sim_time.elapsed_secs();
-
     let Some((front_runner, front_y)) = lowest_marble(&marbles) else {
         return;
     };
@@ -66,6 +60,19 @@ pub fn update_race_leader(
         leader.clear_challenger();
         return;
     }
+
+    // Dos regímenes. En el caos del arranque todas caen casi a la misma altura y el
+    // "más bajo" parpadea por diferencias microscópicas: ahí va suavización fuerte
+    // (hay que sacar un margen claro y sostenerlo). Pasado el arranque el liderazgo es
+    // casi instantáneo: sin margen (cualquier adelanto vale) y un mínimo muy corto que
+    // solo colapsa el parpadeo sub-frame de los empates, para no ensuciar el audio con
+    // segmentos de centésimas. Un liderazgo real de medio segundo se refleja de sobra.
+    let smoothing_window_secs = 2.0;
+    let (lead_margin, min_lead_secs) = if now < smoothing_window_secs {
+        (0.2, 0.5)
+    } else {
+        (0.0, 0.15)
+    };
 
     let current_y = marbles.get(current).map(|(_, t)| t.translation.y);
     let leads_clearly = current_y.is_ok_and(|cy| cy - front_y >= lead_margin);
