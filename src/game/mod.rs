@@ -1,7 +1,9 @@
+pub mod background;
 pub mod bouncy;
 pub mod camera;
 pub mod effects;
 pub mod finish;
+pub mod hud;
 pub mod leader;
 pub mod level;
 pub mod marbles;

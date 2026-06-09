@@ -43,7 +43,7 @@ pub fn spawn_camera_and_lights(mut commands: Commands, offscreen: Option<Res<Off
     if let Some(ref t) = render_target {
         cam2d.target = t.clone();
     }
-    commands.spawn((Camera2d, cam2d));
+    commands.spawn((Camera2d, cam2d, IsDefaultUiCamera));
 
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,

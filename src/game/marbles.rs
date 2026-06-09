@@ -222,8 +222,12 @@ fn spawn_marble_label(commands: &mut Commands, marble_entity: Entity, nickname: 
             font_size: 20.0,
             ..default()
         },
-        TextColor(Color::BLACK),
+        TextColor(Color::WHITE),
         TextLayout::new_with_justify(JustifyText::Center),
+        TextShadow {
+            offset: Vec2::new(2.5, -2.5),
+            color: Color::srgba(0.0, 0.0, 0.0, 0.9),
+        },
         MarbleLabel(marble_entity),
     ));
 }

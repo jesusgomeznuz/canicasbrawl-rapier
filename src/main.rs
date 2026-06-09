@@ -76,7 +76,7 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>) {
             resolution: (540.0, 960.0),
         },
     )
-    .insert_resource(ClearColor(Color::srgb(0.329, 0.765, 0.980)))
+    .insert_resource(ClearColor(Color::srgb_u8(0x07, 0x3B, 0x4C)))
     .insert_resource(production::voice_tracker::VoiceTracker::default())
     .insert_resource(production::stall_detector::StallDetector::default())
     .insert_resource(game::finish::RaceResult::default())
@@ -92,6 +92,9 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>) {
             game::camera::spawn_leader_crown,
             game::world::setup,
             game::world::set_gravity,
+            game::background::spawn_sky,
+            game::background::spawn_stars,
+            game::hud::spawn_hud,
         ),
     )
     // FixedUpdate corre a 60 steps/s junto con la física. Toda la lógica que mide
@@ -126,6 +129,18 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>) {
             game::camera::camera_follows_lowest_marble,
         )
             .after(PhysicsSet::Writeback),
+    )
+    .add_systems(
+        Update,
+        (
+            game::background::update_sky_with_camera,
+            game::background::twinkle_stars,
+            game::hud::init_marble_dots,
+        ),
+    )
+    .add_systems(
+        Update,
+        game::hud::update_hud,
     )
     // Update corre por frame de render en wall-clock — solo el watchdog que cierra
     // la app cuando el solver se atasca (mide tiempo real, no tiempo de simulación).
