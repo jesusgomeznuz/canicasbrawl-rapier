@@ -1,6 +1,7 @@
 pub mod background;
 pub mod bouncy;
 pub mod camera;
+pub mod effect_timers;
 pub mod effects;
 pub mod finish;
 pub mod hud;

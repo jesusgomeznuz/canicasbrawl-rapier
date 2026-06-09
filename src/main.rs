@@ -136,6 +136,9 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>) {
             game::background::update_sky_with_camera,
             game::background::twinkle_stars,
             game::hud::init_marble_dots,
+            game::effect_timers::manage_freeze_badges,
+            game::effect_timers::manage_shrink_badges,
+            game::effect_timers::update_badges,
         ),
     )
     .add_systems(
@@ -151,7 +154,6 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>) {
             game::camera::update_marble_labels,
             game::camera::update_leader_crown,
         )
-            .chain()
             .after(TransformSystem::TransformPropagate),
     )
     .add_systems(Last, production::voice_tracker::save_voice_tracker_on_exit)
