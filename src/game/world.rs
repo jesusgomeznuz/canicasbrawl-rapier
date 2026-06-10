@@ -1,3 +1,4 @@
+use super::background::ColorPalette;
 use super::level::{ModuleData, WorldObject, load_module};
 use super::marbles::Marble;
 use bevy::prelude::*;
@@ -8,7 +9,8 @@ use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rapier_bevy::{
-    AssetsLoading, BodyType, ColliderShape, ObjectDef, SimMode, VisualDef, spawn_object,
+    AssetsLoading, BodyType, ColliderShape, ObjectDef, SimMode, VisualAppearance, VisualDef,
+    spawn_object,
 };
 
 #[derive(Resource)]
@@ -20,28 +22,40 @@ pub struct LevelSeed(pub u64);
 #[derive(Resource)]
 pub struct FinishTarget(pub f32);
 
+/// Reemplaza `VisualDef::white_matte()` con el color tintado de la paleta activa.
+fn tinted_white(color: Color) -> VisualDef {
+    VisualDef {
+        appearance: VisualAppearance::Color(color),
+        roughness: 0.85,
+        ..Default::default()
+    }
+}
+
 pub fn setup(
     mut commands: Commands,
     mode: Res<SimMode>,
     seed: Res<LevelSeed>,
     finish_target: Res<FinishTarget>,
     roster: Res<super::marbles::Roster>,
+    palette: Res<ColorPalette>,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut assets_loading: Option<ResMut<AssetsLoading>>,
 ) {
     let spawn_y = 0.0;
-    let top_margin = 1.5;
+    let top_margin = 0.6;
     let walls_top = 2.0;
     let first_module_top = spawn_y - top_margin;
 
     // Paredes por tramo (sin border_radius para que no se vean las orillas/junturas);
     // cada módulo añade su tramo en generate_level. Un mesh único de toda la columna
     // reventaba el render por las sombras, así que se generan acotados al nivel visible.
+    let obstacle_color = palette.obstacle_color();
     spawn_wall_segment(
         walls_top,
         first_module_top,
+        obstacle_color,
         &mut commands,
         &mode,
         &asset_server,
@@ -131,6 +145,7 @@ pub fn generate_level(
     mut level_gen: ResMut<LevelGen>,
     mut commands: Commands,
     mode: Res<SimMode>,
+    palette: Res<ColorPalette>,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -138,6 +153,7 @@ pub fn generate_level(
     let Some(leader_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else {
         return;
     };
+    let obstacle_color = palette.obstacle_color();
     match decide_level_action(&level_gen, leader_y, sim_time.elapsed_secs()) {
         LevelGenerationAction::GenerateModule => {
             let name = pick_module(&mut level_gen);
@@ -146,6 +162,7 @@ pub fn generate_level(
             let bottom = spawn_module(
                 name,
                 top,
+                obstacle_color,
                 &mut level_gen.rng,
                 &mut commands,
                 &mode,
@@ -156,6 +173,7 @@ pub fn generate_level(
             spawn_wall_segment(
                 top,
                 bottom,
+                obstacle_color,
                 &mut commands,
                 &mode,
                 &asset_server,
@@ -178,6 +196,7 @@ pub fn generate_level(
             spawn_wall_segment(
                 level_gen.next_top,
                 floor_y,
+                obstacle_color,
                 &mut commands,
                 &mode,
                 &asset_server,
@@ -191,6 +210,7 @@ pub fn generate_level(
                 &mut meshes,
                 &mut materials,
                 floor_y,
+                obstacle_color,
             );
             super::finish::spawn_finish_line(
                 &mut commands,
@@ -234,6 +254,7 @@ fn pick_module(level_gen: &mut LevelGen) -> &'static str {
 fn spawn_module(
     name: &str,
     level_top: f32,
+    obstacle_color: Color,
     rng: &mut SmallRng,
     commands: &mut Commands,
     mode: &SimMode,
@@ -282,7 +303,7 @@ fn spawn_module(
                         angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
                         visual: Some(VisualDef {
                             border_radius: *border_radius,
-                            ..VisualDef::white_matte()
+                            ..tinted_white(obstacle_color)
                         }),
                         restitution: Some(restitution.unwrap_or(0.05)),
                         friction: Some(friction.unwrap_or(0.15)),
@@ -314,7 +335,7 @@ fn spawn_module(
                         shape: ColliderShape::Sphere { radius: *radius },
                         position: Vec3::new(*x, *y + y_offset, 0.0),
                         body: BodyType::Static,
-                        visual: Some(VisualDef::white_matte()),
+                        visual: Some(tinted_white(obstacle_color)),
                         restitution: Some(restitution.unwrap_or(0.05)),
                         friction: Some(friction.unwrap_or(0.15)),
                         ..Default::default()
@@ -354,7 +375,7 @@ fn spawn_module(
                             BodyType::Static
                         },
                         angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
-                        visual: Some(VisualDef::white_matte()),
+                        visual: Some(tinted_white(obstacle_color)),
                         restitution: Some(restitution.unwrap_or(0.05)),
                         friction: Some(friction.unwrap_or(0.15)),
                         ..Default::default()
@@ -447,36 +468,37 @@ fn all_sensor_variants() -> &'static [&'static str] {
     &["freeze", "shrink", "swap"]
 }
 
+/// Probabilidad de que un EffectSlot sea ignorado completamente (reduce frecuencia general).
+const EFFECT_SLOT_SKIP_CHANCE: f32 = 0.40;
+
+/// Pesos por variante: freeze 4×, swap 3×, shrink 1× para contrarrestar la ventaja de shrink.
+fn default_effect_weights() -> &'static [(&'static str, u32)] {
+    &[("freeze", 4), ("swap", 3), ("shrink", 1)]
+}
+
 fn resolve_slot_variant<'a>(
     options: &'a [String],
     world_y: f32,
     rng: &mut SmallRng,
 ) -> Option<&'a str> {
-    let pool: Vec<&str> = if options.is_empty() {
-        all_sensor_variants().to_vec()
+    if rng.gen_range(0.0_f32..1.0) < EFFECT_SLOT_SKIP_CHANCE {
+        return None;
+    }
+    if options.is_empty() {
+        let weighted: Vec<&str> = default_effect_weights()
+            .iter()
+            .flat_map(|(name, w)| std::iter::repeat(*name).take(*w as usize))
+            .filter(|v| !should_skip_effect(v, world_y))
+            .collect();
+        weighted.choose(rng).copied()
     } else {
-        options.iter().map(|s| s.as_str()).collect()
-    };
-    let valid: Vec<&str> = pool
-        .iter()
-        .copied()
-        .filter(|v| !should_skip_effect(v, world_y))
-        .collect();
-    valid.choose(rng).copied().map(|v| {
-        if options.is_empty() {
-            all_sensor_variants()
-                .iter()
-                .find(|s| **s == v)
-                .copied()
-                .unwrap_or(v)
-        } else {
-            options
-                .iter()
-                .find(|s| s.as_str() == v)
-                .map(|s| s.as_str())
-                .unwrap_or(v)
-        }
-    })
+        let valid: Vec<&str> = options
+            .iter()
+            .map(|s| s.as_str())
+            .filter(|v| !should_skip_effect(v, world_y))
+            .collect();
+        valid.choose(rng).copied()
+    }
 }
 
 fn should_skip_effect(variant: &str, world_y: f32) -> bool {
@@ -566,6 +588,7 @@ fn spawn_floor(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     floor_y: f32,
+    obstacle_color: Color,
 ) {
     // Grueso a propósito: las canicas llegan a ~20 m/s y un suelo delgado lo atraviesan
     // (tunneling) aunque tengan CCD. Con varios metros de grosor se quedan dentro varios
@@ -582,7 +605,7 @@ fn spawn_floor(
             position: Vec3::new(0.0, floor_y - hy, 0.0),
             visual: Some(VisualDef {
                 border_radius: Some(0.02),
-                ..VisualDef::white_matte()
+                ..tinted_white(obstacle_color)
             }),
             restitution: Some(0.05),
             friction: Some(0.7),
@@ -598,6 +621,7 @@ fn spawn_floor(
 fn spawn_wall_segment(
     top: f32,
     bottom: f32,
+    obstacle_color: Color,
     commands: &mut Commands,
     mode: &SimMode,
     asset_server: &AssetServer,
@@ -621,7 +645,7 @@ fn spawn_wall_segment(
             ObjectDef {
                 shape: wall_shape.clone(),
                 position: Vec3::new(x_sign * (half_width + 0.05), center_y, 0.0),
-                visual: Some(VisualDef::white_matte()),
+                visual: Some(tinted_white(obstacle_color)),
                 restitution: Some(0.05),
                 ..Default::default()
             },

@@ -13,7 +13,7 @@ pub(crate) const UNIT: f32 = 0.35;
 enum Command {
     ProcessModules,
     Preprocess,
-    Sim(SimMode, u64, Option<Vec<String>>),
+    Sim(SimMode, u64, Option<Vec<String>>, game::background::ColorPalette),
 }
 
 fn parse_command() -> Command {
@@ -25,7 +25,18 @@ fn parse_command() -> Command {
         return Command::Preprocess;
     }
     let mode = if args.iter().any(|a| a == "--sim-raw") { SimMode::Raw } else { SimMode::Precomputed };
-    Command::Sim(mode, parse_seed(&args), parse_characters(&args))
+    let palette = parse_palette(&args);
+    Command::Sim(mode, parse_seed(&args), parse_characters(&args), palette)
+}
+
+fn parse_palette(args: &[String]) -> game::background::ColorPalette {
+    if args.iter().any(|a| a == "--neon") {
+        game::background::ColorPalette::neon()
+    } else if args.iter().any(|a| a == "--rosa") {
+        game::background::ColorPalette::rosa()
+    } else {
+        game::background::ColorPalette::azul()
+    }
 }
 
 /// `--characters Name1,Name2,...` → lista de nombres canónicos (CamelCase). Sin el
@@ -52,11 +63,11 @@ fn main() {
     match parse_command() {
         Command::ProcessModules => content::process_modules::run(),
         Command::Preprocess => preprocess_assets(),
-        Command::Sim(mode, seed, characters) => run_sim(mode, seed, characters),
+        Command::Sim(mode, seed, characters, palette) => run_sim(mode, seed, characters, palette),
     }
 }
 
-fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>) {
+fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>, palette: game::background::ColorPalette) {
     let roster = game::marbles::build_roster(characters).unwrap_or_else(|err| {
         eprintln!("Error de roster: {err}");
         std::process::exit(1);
@@ -69,6 +80,7 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>) {
     let finish_target_secs = video_secs - finish_margin_secs;
 
     println!("Level seed: {}", seed);
+    let clear = palette.clear_color();
     game_app(
         mode,
         GameAppConfig {
@@ -76,7 +88,8 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>) {
             resolution: (540.0, 960.0),
         },
     )
-    .insert_resource(ClearColor(Color::srgb_u8(0x07, 0x3B, 0x4C)))
+    .insert_resource(ClearColor(clear))
+    .insert_resource(palette)
     .insert_resource(production::voice_tracker::VoiceTracker::default())
     .insert_resource(production::stall_detector::StallDetector::default())
     .insert_resource(game::finish::RaceResult::default())
@@ -94,6 +107,7 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>) {
             game::world::set_gravity,
             game::background::spawn_sky,
             game::background::spawn_stars,
+            game::background::spawn_clouds,
             game::hud::spawn_hud,
         ),
     )
@@ -135,7 +149,7 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>) {
         (
             game::background::update_sky_with_camera,
             game::background::twinkle_stars,
-            game::hud::init_marble_dots,
+            game::background::update_clouds,
             game::effect_timers::manage_freeze_badges,
             game::effect_timers::manage_shrink_badges,
             game::effect_timers::update_badges,

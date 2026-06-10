@@ -1,5 +1,5 @@
 use super::leader::RaceLeader;
-use super::marbles::{Marble, MarbleLabel};
+use super::marbles::{Marble, MarbleLabel, MarbleLabelOutline};
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::prelude::*;
 use bevy::render::camera::RenderTarget;
@@ -23,13 +23,16 @@ pub fn spawn_camera_and_lights(mut commands: Commands, offscreen: Option<Res<Off
     commands
         .spawn((Camera3d::default(), cam3d, Tonemapping::None, start_pose))
         .with_children(|camera| {
+            // Tres cuartos desde arriba-derecha: ~46° vertical, ~28° horizontal.
+            // Estándar en juegos cartoon/arcade — da volumen a las esferas sin
+            // oscurecer las caras. La ambient actúa como luz de relleno suave.
             camera.spawn((
                 DirectionalLight {
-                    illuminance: 8_000.0,
+                    illuminance: 12_000.0,
                     shadows_enabled: true,
                     ..default()
                 },
-                Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.2, 0.0, 0.0)),
+                Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.45, 0.3, 0.0)),
             ));
         });
 
@@ -47,7 +50,7 @@ pub fn spawn_camera_and_lights(mut commands: Commands, offscreen: Option<Res<Off
 
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
-        brightness: 120.0,
+        brightness: 90.0,
         ..default()
     });
 }
@@ -144,26 +147,32 @@ pub fn world_pos_on_screen(world_pos: Vec3, camera: &Camera, cam_xform: &GlobalT
 
 pub fn update_marble_labels(
     marbles: Query<&GlobalTransform, With<Marble>>,
-    mut labels: Query<(&mut Transform, &mut TextFont, &MarbleLabel)>,
+    mut labels: Query<(&mut Transform, &mut TextFont, &MarbleLabel), Without<MarbleLabelOutline>>,
+    mut outlines: Query<(&mut Transform, &mut TextFont, &MarbleLabelOutline), Without<MarbleLabel>>,
     camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
-    let Ok((camera, cam_gt)) = camera_q.single() else {
-        return;
-    };
-    let Some(viewport) = camera.logical_viewport_size() else {
-        return;
-    };
+    let Ok((camera, cam_gt)) = camera_q.single() else { return };
+    let Some(viewport) = camera.logical_viewport_size() else { return };
     // 2.2% del alto del viewport → tamaño relativo igual en ventana y en --record
     let font_size = viewport.y * 0.022;
     for (mut transform, mut font, MarbleLabel(marble_entity)) in &mut labels {
         font.font_size = font_size;
-        let Ok(marble_gt) = marbles.get(*marble_entity) else {
-            continue;
-        };
+        let Ok(marble_gt) = marbles.get(*marble_entity) else { continue };
         let above = marble_gt.translation() + Vec3::Y * 0.13;
         if let Ok(screen_pos) = camera.world_to_viewport(cam_gt, above) {
             transform.translation.x = screen_pos.x - viewport.x / 2.0;
             transform.translation.y = viewport.y / 2.0 - screen_pos.y;
+            transform.translation.z = 0.0;
+        }
+    }
+    for (mut transform, mut font, outline) in &mut outlines {
+        font.font_size = font_size;
+        let Ok(marble_gt) = marbles.get(outline.marble) else { continue };
+        let above = marble_gt.translation() + Vec3::Y * 0.13;
+        if let Ok(screen_pos) = camera.world_to_viewport(cam_gt, above) {
+            transform.translation.x = screen_pos.x - viewport.x / 2.0 + outline.offset.x;
+            transform.translation.y = viewport.y / 2.0 - screen_pos.y + outline.offset.y;
+            transform.translation.z = -1.0; // detrás del texto blanco
         }
     }
 }

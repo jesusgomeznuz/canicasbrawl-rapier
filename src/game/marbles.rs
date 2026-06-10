@@ -12,6 +12,12 @@ pub struct MarbleName(pub String);
 #[derive(Component)]
 pub struct MarbleLabel(pub Entity);
 
+#[derive(Component)]
+pub struct MarbleLabelOutline {
+    pub marble: Entity,
+    pub offset: Vec2,
+}
+
 pub struct MarbleConfig {
     pub nickname: String,
     pub image: String,
@@ -26,7 +32,9 @@ pub struct Roster(pub Vec<MarbleConfig>);
 /// mismos strings que se emiten como `leader` en voice_tracker.json). Sin nombres,
 /// devuelve el roster por defecto. Falla nombrando al personaje si le falta imagen.
 pub fn build_roster(characters: Option<Vec<String>>) -> Result<Vec<MarbleConfig>, String> {
-    let Some(names) = characters else { return Ok(default_roster()) };
+    let Some(names) = characters else {
+        return Ok(default_roster());
+    };
     if names.len() > 9 {
         return Err(format!(
             "Pediste {} personajes pero el grid de salida es 3×3 (máximo 9).",
@@ -44,7 +52,10 @@ fn character_config(name: &str) -> Result<MarbleConfig, String> {
              Revisa el nombre (CamelCase canónico) o agrega el asset.",
         ));
     }
-    Ok(MarbleConfig { nickname: name.to_string(), image })
+    Ok(MarbleConfig {
+        nickname: name.to_string(),
+        image,
+    })
 }
 
 pub fn spawn_marbles(
@@ -60,12 +71,23 @@ pub fn spawn_marbles(
 ) {
     let grid = spawn_grid(spawn_cx, spawn_cy);
     for (cfg, pos) in roster.iter().zip(grid.iter()) {
-        let entity = spawn_marble_body(commands, mode, asset_server, meshes, materials, cfg, *pos);
+        let color = dominant_color_from_png(&cfg.image).unwrap_or(Color::WHITE);
+        let entity = spawn_marble_body(
+            commands,
+            mode,
+            asset_server,
+            meshes,
+            materials,
+            cfg,
+            *pos,
+            color,
+        );
         spawn_marble_label(commands, entity, &cfg.nickname);
         attach_marble_face(
             commands,
             entity,
             &cfg.image,
+            color,
             asset_server,
             meshes,
             materials,
@@ -75,10 +97,20 @@ pub fn spawn_marbles(
 }
 
 fn default_roster() -> Vec<MarbleConfig> {
-    ["Marceline", "Perla", "Steven", "Wendy", "Naruto", "Ben10", "Patricio", "Finn", "Bart"]
-        .iter()
-        .map(|name| character_config(name).expect("default roster asset missing"))
-        .collect()
+    [
+        "Marceline",
+        "Perla",
+        "Steven",
+        "Wendy",
+        "Naruto",
+        "Ben10",
+        "Patricio",
+        "Finn",
+        "Bart",
+    ]
+    .iter()
+    .map(|name| character_config(name).expect("default roster asset missing"))
+    .collect()
 }
 
 fn spawn_grid(cx: f32, cy: f32) -> [(f32, f32); 9] {
@@ -105,8 +137,9 @@ fn spawn_marble_body(
     materials: &mut Assets<StandardMaterial>,
     cfg: &MarbleConfig,
     (x, y): (f32, f32),
+    body_color: Color,
 ) -> Entity {
-    let radius = 0.09;
+    let radius = 0.085;
     let half_depth = crate::UNIT / 4.0;
     let border = 0.02;
     let entity = spawn_object(
@@ -140,7 +173,7 @@ fn spawn_marble_body(
     );
     let body_mesh = meshes.add(build_marble_mesh(half_depth, radius, border));
     let body_material = materials.add(StandardMaterial {
-        base_color: Color::WHITE,
+        base_color: body_color,
         perceptual_roughness: 0.8,
         metallic: 0.0,
         ..default()
@@ -216,6 +249,23 @@ fn build_marble_mesh(half_depth: f32, radius: f32, border: f32) -> Mesh {
 }
 
 fn spawn_marble_label(commands: &mut Commands, marble_entity: Entity, nickname: &str) {
+    // 4 copias oscuras desplazadas = outline fake (N/S/E/O a 1.5 px, z=-1 para quedar detrás)
+    for &(ox, oy) in &[(-1.5f32, 0.0f32), (1.5, 0.0), (0.0, -1.5), (0.0, 1.5)] {
+        commands.spawn((
+            Text2d::new(nickname),
+            TextFont {
+                font_size: 20.0,
+                ..default()
+            },
+            TextColor(Color::srgba(0.0, 0.0, 0.0, 0.88)),
+            TextLayout::new_with_justify(JustifyText::Center),
+            MarbleLabelOutline {
+                marble: marble_entity,
+                offset: Vec2::new(ox, oy),
+            },
+        ));
+    }
+    // Texto principal blanco encima
     commands.spawn((
         Text2d::new(nickname),
         TextFont {
@@ -224,10 +274,6 @@ fn spawn_marble_label(commands: &mut Commands, marble_entity: Entity, nickname: 
         },
         TextColor(Color::WHITE),
         TextLayout::new_with_justify(JustifyText::Center),
-        TextShadow {
-            offset: Vec2::new(2.5, -2.5),
-            color: Color::srgba(0.0, 0.0, 0.0, 0.9),
-        },
         MarbleLabel(marble_entity),
     ));
 }
@@ -236,30 +282,28 @@ fn attach_marble_face(
     commands: &mut Commands,
     entity: Entity,
     image_path: &str,
+    bg_color: Color,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     assets_loading: &mut Option<ResMut<AssetsLoading>>,
 ) {
-    let radius = 0.09;
+    let radius = 0.085;
     let half_depth = crate::UNIT / 4.0;
     let quad_size = radius * 2.0;
     let quad_z = half_depth;
-
-    let bg_handle: Handle<Image> = asset_server.load("characters/circle_white.png");
     let img_handle: Handle<Image> = asset_server.load(image_path.to_string());
 
     if let Some(al) = assets_loading.as_deref_mut() {
-        al.0.push(bg_handle.clone().untyped());
         al.0.push(img_handle.clone().untyped());
     }
 
     commands.entity(entity).with_children(|parent| {
+        // Disco sólido sin textura → sin píxeles antialiased que causan franja de color
         parent.spawn((
-            Mesh3d(meshes.add(Rectangle::new(quad_size, quad_size))),
+            Mesh3d(meshes.add(Circle::new(radius))),
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color_texture: Some(bg_handle),
-                alpha_mode: AlphaMode::Blend,
+                base_color: bg_color,
                 unlit: true,
                 ..default()
             })),
@@ -276,4 +320,43 @@ fn attach_marble_face(
             Transform::from_xyz(0.0, 0.0, quad_z + 0.002),
         ));
     });
+}
+
+/// Lee el PNG desde `assets/<path>` y devuelve el color más frecuente ignorando:
+/// - píxeles transparentes (alpha < 128)
+/// - píxeles demasiado claros (todos los canales > 200) para no capturar fondos blancos
+/// - píxeles demasiado oscuros (todos < 40) para evitar contornos negros
+/// Los colores se cuantifican en cubos de 32 unidades por canal para agrupar tonos similares.
+fn dominant_color_from_png(image_path: &str) -> Option<Color> {
+    use image::GenericImageView;
+    use std::collections::HashMap;
+
+    let full_path = format!("assets/{}", image_path);
+    let img = image::open(&full_path).ok()?;
+
+    let mut counts: HashMap<(u8, u8, u8), u32> = HashMap::new();
+
+    for (_, _, pixel) in img.pixels() {
+        let [r, g, b, a] = pixel.0;
+        if a < 128 {
+            continue;
+        }
+        if r > 200 && g > 200 && b > 200 {
+            continue;
+        } // blanco / muy claro
+        if r < 40 && g < 40 && b < 40 {
+            continue;
+        } // negro / muy oscuro
+        // Cuantizar a cubos de 32 para agrupar tonos similares
+        let key = (r & 0xE0, g & 0xE0, b & 0xE0);
+        *counts.entry(key).or_insert(0) += 1;
+    }
+
+    let (r, g, b) = counts.into_iter().max_by_key(|(_, c)| *c)?.0;
+    // Usar el centro del cubo (+16) para un color más representativo
+    Some(Color::srgb_u8(
+        r.saturating_add(16),
+        g.saturating_add(16),
+        b.saturating_add(16),
+    ))
 }
