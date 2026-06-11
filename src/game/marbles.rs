@@ -9,6 +9,12 @@ pub struct Marble;
 #[derive(Component)]
 pub struct MarbleName(pub String);
 
+/// Posición de la canica en el roster (= índice de slot en el flujo de casting).
+/// Identidad estable entre bake y replay: los nombres cambian con el cast, el
+/// índice no. Los eventos horneados refieren canicas por este índice.
+#[derive(Component)]
+pub struct MarbleIndex(pub usize);
+
 #[derive(Component)]
 pub struct MarbleLabel(pub Entity);
 
@@ -85,7 +91,7 @@ pub fn spawn_marbles(
     assets_loading: &mut Option<ResMut<AssetsLoading>>,
 ) {
     let grid = spawn_grid(spawn_cx, spawn_cy);
-    for (cfg, pos) in roster.iter().zip(grid.iter()) {
+    for (i, (cfg, pos)) in roster.iter().zip(grid.iter()).enumerate() {
         let color = cfg.image.as_deref()
             .and_then(dominant_color_from_png)
             .unwrap_or(Color::WHITE);
@@ -99,6 +105,7 @@ pub fn spawn_marbles(
             *pos,
             color,
         );
+        commands.entity(entity).insert(MarbleIndex(i));
         spawn_marble_label(commands, entity, &cfg.nickname);
         if let Some(image) = &cfg.image {
             attach_marble_face(

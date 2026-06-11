@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use super::marbles::Marble;
+use super::marbles::{Marble, MarbleIndex};
+use rapier_bevy::BakeEvents;
 
 pub const MARBLE_GROUP: Group = Group::GROUP_1;
 pub const FROZEN_GROUP: Group = Group::GROUP_2;
@@ -50,6 +51,8 @@ pub fn on_freeze_contact(
     freezes: Query<&Transform, (With<FreezeEffect>, Without<Marble>)>,
     marbles: Query<(), (With<Marble>, Without<Frozen>)>,
     camera_q: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
+    indices: Query<&MarbleIndex>,
+    mut bake_events: Option<ResMut<BakeEvents>>,
     time: Res<Time>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -64,6 +67,9 @@ pub fn on_freeze_contact(
             if !marbles.contains(target) { continue }
             if !super::camera::world_pos_on_screen(sensor_xform.translation, projection, cam_xform) { continue }
             info!("effect: freeze @({:.2},{:.2}) t={:.2}", sensor_xform.translation.x, sensor_xform.translation.y, time.elapsed_secs());
+            if let (Some(ev), Ok(idx)) = (bake_events.as_deref_mut(), indices.get(target)) {
+                ev.0.push(format!("freeze {} {:.3} {:.3} {}", idx.0, sensor_xform.translation.x, sensor_xform.translation.y, duration));
+            }
             let visual = spawn_frozen_visual(&mut commands, &mut meshes, &mut materials, target);
             commands.entity(target).insert((
                 Frozen { expires_at: time.elapsed_secs() + duration, visual },
@@ -75,7 +81,7 @@ pub fn on_freeze_contact(
     }
 }
 
-fn spawn_frozen_visual(
+pub(crate) fn spawn_frozen_visual(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -101,6 +107,8 @@ pub fn on_shrink_contact(
     shrinks: Query<&Transform, (With<ShrinkEffect>, Without<Marble>)>,
     mut marbles: Query<&mut Transform, (With<Marble>, Without<Shrunk>, Without<ShrinkEffect>)>,
     camera_q: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
+    indices: Query<&MarbleIndex>,
+    mut bake_events: Option<ResMut<BakeEvents>>,
     time: Res<Time>,
     mut commands: Commands,
 ) {
@@ -114,6 +122,9 @@ pub fn on_shrink_contact(
             if !super::camera::world_pos_on_screen(sensor_xform.translation, projection, cam_xform) { continue }
             if let Ok(mut transform) = marbles.get_mut(target) {
                 info!("effect: shrink @({:.2},{:.2}) t={:.2}", sensor_xform.translation.x, sensor_xform.translation.y, time.elapsed_secs());
+                if let (Some(ev), Ok(idx)) = (bake_events.as_deref_mut(), indices.get(target)) {
+                    ev.0.push(format!("shrink {} {:.3} {:.3} {}", idx.0, sensor_xform.translation.x, sensor_xform.translation.y, duration));
+                }
                 transform.scale = Vec3::splat(factor);
                 commands.entity(target).insert(Shrunk {
                     expires_at: time.elapsed_secs() + duration,
@@ -129,6 +140,8 @@ pub fn on_swap_contact(
     swaps: Query<&Transform, (With<SwapEffect>, Without<Marble>)>,
     mut marbles: Query<(Entity, &mut Transform), (With<Marble>, Without<SwapEffect>)>,
     camera_q: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
+    indices: Query<&MarbleIndex>,
+    mut bake_events: Option<ResMut<BakeEvents>>,
     time: Res<Time>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -149,6 +162,9 @@ pub fn on_swap_contact(
                 continue;
             };
             info!("effect: swap @({:.2},{:.2}) t={:.2}", sensor_xform.translation.x, sensor_xform.translation.y, time.elapsed_secs());
+            if let (Some(ev), Ok(ia), Ok(ib)) = (bake_events.as_deref_mut(), indices.get(target), indices.get(partner)) {
+                ev.0.push(format!("swap {} {} {:.3} {:.3}", ia.0, ib.0, sensor_xform.translation.x, sensor_xform.translation.y));
+            }
             if let Ok((_, mut t)) = marbles.get_mut(target) { t.translation = partner_pos; }
             if let Ok((_, mut t)) = marbles.get_mut(partner) { t.translation = target_pos; }
             spawn_swap_rings(&mut commands, &mut meshes, &mut materials, &time, target, partner);
@@ -164,7 +180,7 @@ pub struct SwapRing {
     pub lifetime: f32,
 }
 
-fn spawn_swap_rings(
+pub(crate) fn spawn_swap_rings(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,

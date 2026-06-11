@@ -8,4 +8,5 @@ pub mod hud;
 pub mod leader;
 pub mod level;
 pub mod marbles;
+pub mod replay_effects;
 pub mod world;

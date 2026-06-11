@@ -217,6 +217,17 @@ fn run_sim(mode: SimMode, seed: u64, spec: RosterSpec, palette: game::background
             )
                 .after(PhysicsSet::Writeback),
         );
+    } else {
+        // En replay la utilería de los efectos (sensor consumido, hielo, anillos)
+        // se re-actúa desde los eventos horneados en la timeline.
+        app.add_systems(
+            FixedUpdate,
+            (
+                game::replay_effects::apply_replay_effects,
+                game::replay_effects::expire_replay_freezes,
+            )
+                .after(PhysicsSet::Writeback),
+        );
     }
 
     app.run();
