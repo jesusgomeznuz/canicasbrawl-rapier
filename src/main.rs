@@ -5,7 +5,7 @@ mod production;
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy_rapier3d::plugin::PhysicsSet;
-use rapier_bevy::{GameAppConfig, SimMode, game_app, preprocess_assets, record_duration};
+use rapier_bevy::{GameAppConfig, SimMode, bake_duration, game_app, preprocess_assets, record_duration};
 
 // Profundidad Z de canicas y plataformas — temporal mientras se calibran las físicas
 pub(crate) const UNIT: f32 = 0.35;
@@ -75,7 +75,7 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>, palette: g
 
     // La meta se cierra unos segundos antes del final del video para dejar cola de
     // canicas cayendo. En ventana (sin --record) se asume un minuto.
-    let video_secs = record_duration().map(|d| d as f32).unwrap_or(60.0);
+    let video_secs = record_duration().or_else(bake_duration).map(|d| d as f32).unwrap_or(60.0);
     let finish_margin_secs = 12.0;
     let finish_target_secs = video_secs - finish_margin_secs;
 
