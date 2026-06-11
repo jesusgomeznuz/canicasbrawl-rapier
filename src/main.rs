@@ -13,7 +13,16 @@ pub(crate) const UNIT: f32 = 0.35;
 enum Command {
     ProcessModules,
     Preprocess,
-    Sim(SimMode, u64, Option<Vec<String>>, game::background::ColorPalette),
+    Sim(SimMode, u64, RosterSpec, game::background::ColorPalette),
+}
+
+/// Quién corre la carrera. `Slots` es el modo casting: física anónima
+/// (slot_0..slot_{N-1}) cuyo reparto se decide al renderizar — la posición i
+/// de `--characters` viste al slot_i de la timeline horneada.
+enum RosterSpec {
+    Default,
+    Characters(Vec<String>),
+    Slots(usize),
 }
 
 fn parse_command() -> Command {
@@ -26,7 +35,7 @@ fn parse_command() -> Command {
     }
     let mode = if args.iter().any(|a| a == "--sim-raw") { SimMode::Raw } else { SimMode::Precomputed };
     let palette = parse_palette(&args);
-    Command::Sim(mode, parse_seed(&args), parse_characters(&args), palette)
+    Command::Sim(mode, parse_seed(&args), parse_roster_spec(&args), palette)
 }
 
 fn parse_palette(args: &[String]) -> game::background::ColorPalette {
@@ -45,6 +54,22 @@ fn parse_characters(args: &[String]) -> Option<Vec<String>> {
     args.iter().position(|a| a == "--characters")
         .and_then(|i| args.get(i + 1))
         .map(|list| list.split(',').map(|s| s.trim().to_string()).collect())
+}
+
+fn parse_roster_spec(args: &[String]) -> RosterSpec {
+    let slots = args.iter().position(|a| a == "--slots")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|s| s.parse().ok());
+    match (slots, parse_characters(args)) {
+        (Some(_), Some(_)) => {
+            eprintln!("--slots y --characters son excluyentes: la física se hornea anónima \
+                       con --slots y se viste con --characters al renderizar la timeline.");
+            std::process::exit(1);
+        }
+        (Some(n), None)      => RosterSpec::Slots(n),
+        (None, Some(names))  => RosterSpec::Characters(names),
+        (None, None)         => RosterSpec::Default,
+    }
 }
 
 fn parse_seed(args: &[String]) -> u64 {
@@ -67,8 +92,13 @@ fn main() {
     }
 }
 
-fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>, palette: game::background::ColorPalette) {
-    let roster = game::marbles::build_roster(characters).unwrap_or_else(|err| {
+fn run_sim(mode: SimMode, seed: u64, spec: RosterSpec, palette: game::background::ColorPalette) {
+    let roster = match spec {
+        RosterSpec::Default            => game::marbles::build_roster(None),
+        RosterSpec::Characters(names)  => game::marbles::build_roster(Some(names)),
+        RosterSpec::Slots(n)           => game::marbles::slots_roster(n),
+    }
+    .unwrap_or_else(|err| {
         eprintln!("Error de roster: {err}");
         std::process::exit(1);
     });

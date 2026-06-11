@@ -20,7 +20,9 @@ pub struct MarbleLabelOutline {
 
 pub struct MarbleConfig {
     pub nickname: String,
-    pub image: String,
+    /// `None` = canica anónima (modo `--slots`): sin cara ni color de personaje.
+    /// La física no depende de la identidad, así que el reparto se decide después.
+    pub image: Option<String>,
 }
 
 /// Qué personajes corren esta carrera. Lo arma `build_roster` desde el CLI
@@ -44,6 +46,19 @@ pub fn build_roster(characters: Option<Vec<String>>) -> Result<Vec<MarbleConfig>
     names.iter().map(|name| character_config(name)).collect()
 }
 
+/// Roster anónimo para el casting: N canicas `slot_0..slot_{N-1}` sin identidad.
+/// El bake corre la física con slots y el voice_tracker reporta qué slot lidera;
+/// al renderizar la timeline elegida, `--characters` viste los slots por posición
+/// (el nombre i-ésimo es slot_i). Mismo N y mismo orden de spawn en ambas fases.
+pub fn slots_roster(n: usize) -> Result<Vec<MarbleConfig>, String> {
+    if n == 0 || n > 9 {
+        return Err(format!("--slots {n}: el grid de salida es 3×3 (entre 1 y 9)."));
+    }
+    Ok((0..n)
+        .map(|i| MarbleConfig { nickname: format!("slot_{i}"), image: None })
+        .collect())
+}
+
 fn character_config(name: &str) -> Result<MarbleConfig, String> {
     let image = format!("characters/{}.png", name.to_lowercase());
     if !std::path::Path::new("assets").join(&image).exists() {
@@ -54,7 +69,7 @@ fn character_config(name: &str) -> Result<MarbleConfig, String> {
     }
     Ok(MarbleConfig {
         nickname: name.to_string(),
-        image,
+        image: Some(image),
     })
 }
 
@@ -71,7 +86,9 @@ pub fn spawn_marbles(
 ) {
     let grid = spawn_grid(spawn_cx, spawn_cy);
     for (cfg, pos) in roster.iter().zip(grid.iter()) {
-        let color = dominant_color_from_png(&cfg.image).unwrap_or(Color::WHITE);
+        let color = cfg.image.as_deref()
+            .and_then(dominant_color_from_png)
+            .unwrap_or(Color::WHITE);
         let entity = spawn_marble_body(
             commands,
             mode,
@@ -83,16 +100,18 @@ pub fn spawn_marbles(
             color,
         );
         spawn_marble_label(commands, entity, &cfg.nickname);
-        attach_marble_face(
-            commands,
-            entity,
-            &cfg.image,
-            color,
-            asset_server,
-            meshes,
-            materials,
-            assets_loading,
-        );
+        if let Some(image) = &cfg.image {
+            attach_marble_face(
+                commands,
+                entity,
+                image,
+                color,
+                asset_server,
+                meshes,
+                materials,
+                assets_loading,
+            );
+        }
     }
 }
 
