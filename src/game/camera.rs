@@ -135,14 +135,25 @@ pub fn update_leader_crown(
     *crown_v = Visibility::Hidden;
 }
 
-pub fn world_pos_on_screen(world_pos: Vec3, camera: &Camera, cam_xform: &GlobalTransform) -> bool {
-    let Ok(viewport) = camera.world_to_viewport(cam_xform, world_pos) else {
-        return false;
+/// Aspecto del diseño (vertical 9:16). Fijo a propósito: el aspecto NO se lee del
+/// render target porque en bake (headless) no existe viewport, y este check decide
+/// FÍSICA (qué sensores disparan) — debe dar lo mismo con ventana, --record o --bake.
+const DESIGN_ASPECT: f32 = 9.0 / 16.0;
+
+pub fn world_pos_on_screen(world_pos: Vec3, projection: &Projection, cam_xform: &GlobalTransform) -> bool {
+    let Projection::Perspective(persp) = projection else {
+        return true;
     };
-    let Some(size) = camera.logical_viewport_size() else {
+    // Proyección manual en espacio de cámara: idéntica en todos los modos, a
+    // diferencia de world_to_viewport, que requiere un render target vivo.
+    let local = cam_xform.affine().inverse().transform_point3(world_pos);
+    let depth = -local.z;
+    if depth <= 0.0 {
         return false;
-    };
-    (0.0..=size.x).contains(&viewport.x) && (0.0..=size.y).contains(&viewport.y)
+    }
+    let half_h = depth * (persp.fov * 0.5).tan();
+    let half_w = half_h * DESIGN_ASPECT;
+    local.x.abs() <= half_w && local.y.abs() <= half_h
 }
 
 pub fn update_marble_labels(

@@ -49,20 +49,21 @@ pub fn on_freeze_contact(
     mut events: EventReader<CollisionEvent>,
     freezes: Query<&Transform, (With<FreezeEffect>, Without<Marble>)>,
     marbles: Query<(), (With<Marble>, Without<Frozen>)>,
-    camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera_q: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
     time: Res<Time>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut commands: Commands,
 ) {
     let duration = 2.0_f32;
-    let Ok((camera, cam_xform)) = camera_q.single() else { return };
+    let Ok((projection, cam_xform)) = camera_q.single() else { return };
     for event in events.read() {
         let CollisionEvent::Started(a, b, _) = event else { continue };
         for (sensor, target) in [(*a, *b), (*b, *a)] {
             let Ok(sensor_xform) = freezes.get(sensor) else { continue };
             if !marbles.contains(target) { continue }
-            if !super::camera::world_pos_on_screen(sensor_xform.translation, camera, cam_xform) { continue }
+            if !super::camera::world_pos_on_screen(sensor_xform.translation, projection, cam_xform) { continue }
+            info!("effect: freeze @({:.2},{:.2}) t={:.2}", sensor_xform.translation.x, sensor_xform.translation.y, time.elapsed_secs());
             let visual = spawn_frozen_visual(&mut commands, &mut meshes, &mut materials, target);
             commands.entity(target).insert((
                 Frozen { expires_at: time.elapsed_secs() + duration, visual },
@@ -99,19 +100,20 @@ pub fn on_shrink_contact(
     mut events: EventReader<CollisionEvent>,
     shrinks: Query<&Transform, (With<ShrinkEffect>, Without<Marble>)>,
     mut marbles: Query<&mut Transform, (With<Marble>, Without<Shrunk>, Without<ShrinkEffect>)>,
-    camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera_q: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
     time: Res<Time>,
     mut commands: Commands,
 ) {
     let duration = 5.0_f32;
     let factor   = 0.5_f32;
-    let Ok((camera, cam_xform)) = camera_q.single() else { return };
+    let Ok((projection, cam_xform)) = camera_q.single() else { return };
     for event in events.read() {
         let CollisionEvent::Started(a, b, _) = event else { continue };
         for (sensor, target) in [(*a, *b), (*b, *a)] {
             let Ok(sensor_xform) = shrinks.get(sensor) else { continue };
-            if !super::camera::world_pos_on_screen(sensor_xform.translation, camera, cam_xform) { continue }
+            if !super::camera::world_pos_on_screen(sensor_xform.translation, projection, cam_xform) { continue }
             if let Ok(mut transform) = marbles.get_mut(target) {
+                info!("effect: shrink @({:.2},{:.2}) t={:.2}", sensor_xform.translation.x, sensor_xform.translation.y, time.elapsed_secs());
                 transform.scale = Vec3::splat(factor);
                 commands.entity(target).insert(Shrunk {
                     expires_at: time.elapsed_secs() + duration,
@@ -126,18 +128,18 @@ pub fn on_swap_contact(
     mut events: EventReader<CollisionEvent>,
     swaps: Query<&Transform, (With<SwapEffect>, Without<Marble>)>,
     mut marbles: Query<(Entity, &mut Transform), (With<Marble>, Without<SwapEffect>)>,
-    camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera_q: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
     time: Res<Time>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut commands: Commands,
 ) {
-    let Ok((camera, cam_xform)) = camera_q.single() else { return };
+    let Ok((projection, cam_xform)) = camera_q.single() else { return };
     for event in events.read() {
         let CollisionEvent::Started(a, b, _) = event else { continue };
         for (sensor, target) in [(*a, *b), (*b, *a)] {
             let Ok(sensor_xform) = swaps.get(sensor) else { continue };
-            if !super::camera::world_pos_on_screen(sensor_xform.translation, camera, cam_xform) { continue }
+            if !super::camera::world_pos_on_screen(sensor_xform.translation, projection, cam_xform) { continue }
             let positions: Vec<(Entity, Vec3)> = marbles.iter()
                 .map(|(e, t)| (e, t.translation))
                 .collect();
@@ -146,6 +148,7 @@ pub fn on_swap_contact(
                 commands.entity(sensor).despawn();
                 continue;
             };
+            info!("effect: swap @({:.2},{:.2}) t={:.2}", sensor_xform.translation.x, sensor_xform.translation.y, time.elapsed_secs());
             if let Ok((_, mut t)) = marbles.get_mut(target) { t.translation = partner_pos; }
             if let Ok((_, mut t)) = marbles.get_mut(partner) { t.translation = target_pos; }
             spawn_swap_rings(&mut commands, &mut meshes, &mut materials, &time, target, partner);
