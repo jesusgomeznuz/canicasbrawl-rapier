@@ -27,6 +27,10 @@ cargo run -- --sim-raw                              # física sin precomputing (
 # Modificadores (combinables con Sim)
 cargo run -- --debug                                # activa RapierDebugRenderPlugin
 cargo run -- --record 30                            # graba 30 s → outputs/record_30s.mp4
+cargo run -- --bake 60 --slots 9 --seed 7           # casting: SOLO física, canicas anónimas → outputs/bake_60s.timeline + voice_tracker con slot_N
+cargo run -- --record 60 --replay outputs/bake_60s.timeline --seed 7 --characters A,B,...
+                                                    # render desde timeline; el nombre i-ésimo viste al slot_i
+# Regla: bake y record de la MISMA duración y seed (la meta depende de la duración)
 
 # Bench vive en el engine, no en el juego
 cd ../rapier-bevy && cargo run -- --bench falling-spheres 200
