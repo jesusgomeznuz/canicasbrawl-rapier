@@ -5,7 +5,7 @@ mod production;
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy_rapier3d::plugin::PhysicsSet;
-use rapier_bevy::{GameAppConfig, SimMode, bake_duration, game_app, preprocess_assets, record_duration};
+use rapier_bevy::{GameAppConfig, SimMode, bake_duration, game_app, preprocess_assets, record_duration, replay_path};
 
 // Profundidad Z de canicas y plataformas — temporal mientras se calibran las físicas
 pub(crate) const UNIT: f32 = 0.35;
@@ -79,15 +79,21 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>, palette: g
     let finish_margin_secs = 12.0;
     let finish_target_secs = video_secs - finish_margin_secs;
 
+    // En replay no hay física → CollisionEvent nunca se inicializa; los sistemas que
+    // lo leen hacen panic si se registran. Se gatean aquí en lugar de en cada sistema
+    // para no dispersar la condición por todo el codebase.
+    let is_replay = replay_path().is_some();
+
     println!("Level seed: {}", seed);
     let clear = palette.clear_color();
-    game_app(
+    let mut app = game_app(
         mode,
         GameAppConfig {
             title: "CanicasBrawl",
             resolution: (540.0, 960.0),
         },
-    )
+    );
+    app
     .insert_resource(ClearColor(clear))
     .insert_resource(palette)
     .insert_resource(production::voice_tracker::VoiceTracker::default())
@@ -130,14 +136,10 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>, palette: g
         FixedUpdate,
         (
             game::world::generate_level,
-            game::effects::on_freeze_contact,
-            game::effects::on_shrink_contact,
-            game::effects::on_swap_contact,
             game::effects::try_unfreeze,
             game::effects::try_unshrink,
             game::effects::fade_swap_rings,
             game::effects::spin_icons,
-            game::bouncy::trigger_bouncy_pulse,
             game::bouncy::animate_bounce_pulse,
             game::bouncy::tick_bounce_cooldown,
             game::camera::camera_follows_lowest_marble,
@@ -170,6 +172,22 @@ fn run_sim(mode: SimMode, seed: u64, characters: Option<Vec<String>>, palette: g
         )
             .after(TransformSystem::TransformPropagate),
     )
-    .add_systems(Last, production::voice_tracker::save_voice_tracker_on_exit)
-    .run();
+    .add_systems(Last, production::voice_tracker::save_voice_tracker_on_exit);
+
+    // Sistemas que leen CollisionEvent: solo disponible cuando corre física (bake/sim),
+    // no en replay donde la timeline dicta los transforms sin colisiones.
+    if !is_replay {
+        app.add_systems(
+            FixedUpdate,
+            (
+                game::effects::on_freeze_contact,
+                game::effects::on_shrink_contact,
+                game::effects::on_swap_contact,
+                game::bouncy::trigger_bouncy_pulse,
+            )
+                .after(PhysicsSet::Writeback),
+        );
+    }
+
+    app.run();
 }
