@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use rapier_bevy::{
-    AssetsLoading, BodyType, ColliderShape, LockedAxes, ObjectDef, SimMode, spawn_object,
+    AssetsLoading, BakeKey, BodyType, ColliderShape, LockedAxes, ObjectDef, SimMode, spawn_object,
 };
 
 #[derive(Component)]
@@ -105,8 +105,8 @@ pub fn spawn_marbles(
             *pos,
             color,
         );
-        commands.entity(entity).insert(MarbleIndex(i));
-        spawn_marble_label(commands, entity, &cfg.nickname);
+        commands.entity(entity).insert((MarbleIndex(i), BakeKey(i as u64)));
+        spawn_marble_label(commands, asset_server, entity, &cfg.nickname);
         if let Some(image) = &cfg.image {
             attach_marble_face(
                 commands,
@@ -274,12 +274,21 @@ fn build_marble_mesh(half_depth: f32, radius: f32, border: f32) -> Mesh {
     mesh
 }
 
-fn spawn_marble_label(commands: &mut Commands, marble_entity: Entity, nickname: &str) {
+fn spawn_marble_label(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    marble_entity: Entity,
+    nickname: &str,
+) {
+    // La fuente default de Bevy es un subset ASCII: nombres con acentos ("pacífica")
+    // renderizaban tofu (□). DM Sans cubre Latín extendido.
+    let font = asset_server.load("fonts/DMSans-Medium.ttf");
     // 4 copias oscuras desplazadas = outline fake (N/S/E/O a 1.5 px, z=-1 para quedar detrás)
     for &(ox, oy) in &[(-1.5f32, 0.0f32), (1.5, 0.0), (0.0, -1.5), (0.0, 1.5)] {
         commands.spawn((
             Text2d::new(nickname),
             TextFont {
+                font: font.clone(),
                 font_size: 20.0,
                 ..default()
             },
@@ -295,6 +304,7 @@ fn spawn_marble_label(commands: &mut Commands, marble_entity: Entity, nickname: 
     commands.spawn((
         Text2d::new(nickname),
         TextFont {
+            font,
             font_size: 20.0,
             ..default()
         },

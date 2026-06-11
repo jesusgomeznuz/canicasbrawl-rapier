@@ -6,7 +6,7 @@ use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
 use rand::Rng;
 use rand::RngCore;
-use rapier_bevy::BakeEvents;
+use rapier_bevy::{BakeEvents, BakeKey};
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
@@ -220,9 +220,8 @@ pub(crate) fn spawn_level_module(
     materials: &mut Assets<StandardMaterial>,
 ) -> f32 {
     let module_gap = 0.1;
-    let mut rng = SmallRng::seed_from_u64(module_seed);
     let bottom = spawn_module(
-        name, top, obstacle_color, &mut rng,
+        name, top, obstacle_color, module_seed,
         commands, mode, asset_server, meshes, materials,
     ) - module_gap;
     spawn_wall_segment(top, bottom, obstacle_color, commands, mode, asset_server, meshes, materials);
@@ -279,13 +278,18 @@ fn spawn_module(
     name: &str,
     level_top: f32,
     obstacle_color: Color,
-    rng: &mut SmallRng,
+    module_seed: u64,
     commands: &mut Commands,
     mode: &SimMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
 ) -> f32 {
+    let rng = &mut SmallRng::seed_from_u64(module_seed);
+    // Key estable por cuerpo: (seed del módulo, índice del objeto). Las canicas usan
+    // 0..N como key — el seed (u64 aleatorio) no colisiona con eso en la práctica, y
+    // el bake hace assert de unicidad por si acaso.
+    let body_key = |obj_idx: usize| BakeKey(module_seed ^ ((obj_idx as u64 + 1) << 32));
     let ModuleData { objects, .. } = load_module(name);
     let (y_min, y_max) = objects
         .iter()
@@ -295,7 +299,7 @@ fn spawn_module(
         });
     let trimmed_height = y_max - y_min;
     let y_offset = level_top - y_max;
-    for obj in &objects {
+    for (obj_idx, obj) in objects.iter().enumerate() {
         match obj {
             WorldObject::Box {
                 x,
@@ -338,6 +342,7 @@ fn spawn_module(
                     meshes,
                     materials,
                 );
+                commands.entity(entity).insert(body_key(obj_idx));
                 if *bouncy {
                     commands.entity(entity).insert((
                         ActiveEvents::COLLISION_EVENTS,
@@ -369,6 +374,7 @@ fn spawn_module(
                     meshes,
                     materials,
                 );
+                commands.entity(entity).insert(body_key(obj_idx));
                 if *bouncy {
                     commands.entity(entity).insert((
                         ActiveEvents::COLLISION_EVENTS,
@@ -385,7 +391,7 @@ fn spawn_module(
                 friction,
                 restitution,
             } => {
-                spawn_object(
+                let entity = spawn_object(
                     commands,
                     ObjectDef {
                         shape: ColliderShape::MeshObject {
@@ -409,6 +415,7 @@ fn spawn_module(
                     meshes,
                     materials,
                 );
+                commands.entity(entity).insert(body_key(obj_idx));
             }
             WorldObject::Image {
                 x,
