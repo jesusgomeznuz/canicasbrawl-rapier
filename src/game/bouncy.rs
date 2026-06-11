@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{CollisionEvent, Velocity};
+use rapier_bevy::BakeEvents;
 
 #[derive(Component)]
 pub struct BouncyOnContact;
@@ -21,6 +22,7 @@ pub fn trigger_bouncy_pulse(
     already_pulsing: Query<(), Or<(With<BouncePulse>, With<BounceCooldown>)>>,
     movers: Query<(&Transform, &Velocity)>,
     mut commands: Commands,
+    mut bake_events: Option<ResMut<BakeEvents>>,
 ) {
     let base_amp     = 0.04_f32;
     let speed_scale  = 0.05_f32;
@@ -36,6 +38,9 @@ pub fn trigger_bouncy_pulse(
                     (-v.linvel.dot(dir)).max(0.0)
                 }).unwrap_or(0.0);
                 let amp = (base_amp + closing * speed_scale).min(max_amp);
+                if let Some(ev) = bake_events.as_deref_mut() {
+                    ev.0.push(format!("bouncy {} {} {amp}", sphere_t.translation.x, sphere_t.translation.y));
+                }
                 commands.entity(sphere).insert(BouncePulse { elapsed: 0.0, amplitude: amp });
             }
         }

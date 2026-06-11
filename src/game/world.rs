@@ -5,6 +5,8 @@ use bevy::prelude::*;
 use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
 use rand::Rng;
+use rand::RngCore;
+use rapier_bevy::BakeEvents;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
@@ -149,6 +151,7 @@ pub fn generate_level(
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut bake_events: Option<ResMut<BakeEvents>>,
 ) {
     let Some(leader_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else {
         return;
@@ -157,22 +160,14 @@ pub fn generate_level(
     match decide_level_action(&level_gen, leader_y, sim_time.elapsed_secs()) {
         LevelGenerationAction::GenerateModule => {
             let name = pick_module(&mut level_gen);
-            let module_gap = 0.1;
             let top = level_gen.next_top;
-            let bottom = spawn_module(
+            // Cada módulo recibe su propio seed: las variantes dejan de depender del
+            // stream global, así el replay reconstruye el módulo exacto desde el evento.
+            let module_seed = level_gen.rng.next_u64();
+            let bottom = spawn_level_module(
                 name,
                 top,
-                obstacle_color,
-                &mut level_gen.rng,
-                &mut commands,
-                &mode,
-                &asset_server,
-                &mut meshes,
-                &mut materials,
-            ) - module_gap;
-            spawn_wall_segment(
-                top,
-                bottom,
+                module_seed,
                 obstacle_color,
                 &mut commands,
                 &mode,
@@ -180,6 +175,9 @@ pub fn generate_level(
                 &mut meshes,
                 &mut materials,
             );
+            if let Some(ev) = bake_events.as_deref_mut() {
+                ev.0.push(format!("module {name} {top} {module_seed}"));
+            }
             level_gen.next_top = bottom;
             level_gen.last_module = Some(name);
             level_gen.modules_spawned += 1;
@@ -189,13 +187,8 @@ pub fn generate_level(
             // la líder, ya cerca de él, cae los últimos metros y la cruza. Se deja un
             // hueco antes de la meta (aire tras el último módulo) y otro debajo de ella
             // (para ver caer la cola entre la meta y el suelo).
-            let gap_module_to_finish = 0.4;
-            let gap_finish_to_floor = 1.0;
-            let finish_y = level_gen.next_top - gap_module_to_finish;
-            let floor_y = finish_y - gap_finish_to_floor;
-            spawn_wall_segment(
+            close_level_with_finish(
                 level_gen.next_top,
-                floor_y,
                 obstacle_color,
                 &mut commands,
                 &mode,
@@ -203,26 +196,57 @@ pub fn generate_level(
                 &mut meshes,
                 &mut materials,
             );
-            spawn_floor(
-                &mut commands,
-                &mode,
-                &asset_server,
-                &mut meshes,
-                &mut materials,
-                floor_y,
-                obstacle_color,
-            );
-            super::finish::spawn_finish_line(
-                &mut commands,
-                &mut meshes,
-                &mut materials,
-                &asset_server,
-                finish_y,
-            );
+            if let Some(ev) = bake_events.as_deref_mut() {
+                ev.0.push(format!("finish {}", level_gen.next_top));
+            }
             level_gen.finish_spawned = true;
         }
         LevelGenerationAction::DoNothing => {}
     }
+}
+
+/// Spawnea un módulo completo (obstáculos + variantes + tramo de pared) de forma
+/// reproducible: `module_seed` aísla el RNG de las variantes, así el mismo evento
+/// horneado reconstruye el módulo idéntico en replay. Devuelve el nuevo horizonte.
+pub(crate) fn spawn_level_module(
+    name: &str,
+    top: f32,
+    module_seed: u64,
+    obstacle_color: Color,
+    commands: &mut Commands,
+    mode: &SimMode,
+    asset_server: &AssetServer,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+) -> f32 {
+    let module_gap = 0.1;
+    let mut rng = SmallRng::seed_from_u64(module_seed);
+    let bottom = spawn_module(
+        name, top, obstacle_color, &mut rng,
+        commands, mode, asset_server, meshes, materials,
+    ) - module_gap;
+    spawn_wall_segment(top, bottom, obstacle_color, commands, mode, asset_server, meshes, materials);
+    bottom
+}
+
+/// Cierra el nivel en el horizonte: pared final, suelo y la meta, con aire antes de
+/// la meta y debajo de ella (para ver caer la cola de canicas).
+pub(crate) fn close_level_with_finish(
+    next_top: f32,
+    obstacle_color: Color,
+    commands: &mut Commands,
+    mode: &SimMode,
+    asset_server: &AssetServer,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+) {
+    let gap_module_to_finish = 0.4;
+    let gap_finish_to_floor = 1.0;
+    let finish_y = next_top - gap_module_to_finish;
+    let floor_y = finish_y - gap_finish_to_floor;
+    spawn_wall_segment(next_top, floor_y, obstacle_color, commands, mode, asset_server, meshes, materials);
+    spawn_floor(commands, mode, asset_server, meshes, materials, floor_y, obstacle_color);
+    super::finish::spawn_finish_line(commands, meshes, materials, asset_server, finish_y);
 }
 
 /// Elige el siguiente módulo del pool ponderado, sin repetir el anterior. El primer

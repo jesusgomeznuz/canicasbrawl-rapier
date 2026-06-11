@@ -165,7 +165,6 @@ fn run_sim(mode: SimMode, seed: u64, spec: RosterSpec, palette: game::background
     .add_systems(
         FixedUpdate,
         (
-            game::world::generate_level,
             game::effects::try_unfreeze,
             game::effects::try_unshrink,
             game::effects::fade_swap_rings,
@@ -210,6 +209,7 @@ fn run_sim(mode: SimMode, seed: u64, spec: RosterSpec, palette: game::background
         app.add_systems(
             FixedUpdate,
             (
+                game::world::generate_level,
                 game::effects::on_freeze_contact,
                 game::effects::on_shrink_contact,
                 game::effects::on_swap_contact,
