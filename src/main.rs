@@ -210,6 +210,7 @@ fn run_sim(mode: SimMode, seed: u64, spec: RosterSpec, palette: game::background
             FixedUpdate,
             (
                 game::world::generate_level,
+                game::world::disable_modules_above_screen,
                 game::effects::on_freeze_contact,
                 game::effects::on_shrink_contact,
                 game::effects::on_swap_contact,

@@ -156,6 +156,31 @@ pub fn world_pos_on_screen(world_pos: Vec3, projection: &Projection, cam_xform: 
     local.x.abs() <= half_w && local.y.abs() <= half_h
 }
 
+/// True si el punto (0, `world_y`, 0) del plano de la arena queda por encima del
+/// borde superior de la pantalla por más de `margin` metros. Misma proyección manual
+/// (y mismas razones) que [`world_pos_on_screen`]: decide FÍSICA, debe dar lo mismo
+/// con ventana, --record o --bake.
+pub fn world_y_above_screen(
+    world_y: f32,
+    margin: f32,
+    projection: &Projection,
+    cam_xform: &GlobalTransform,
+) -> bool {
+    let Projection::Perspective(persp) = projection else {
+        return false;
+    };
+    let local = cam_xform
+        .affine()
+        .inverse()
+        .transform_point3(Vec3::new(0.0, world_y, 0.0));
+    let depth = -local.z;
+    if depth <= 0.0 {
+        return false;
+    }
+    let half_h = depth * (persp.fov * 0.5).tan();
+    local.y > half_h + margin
+}
+
 pub fn update_marble_labels(
     marbles: Query<&GlobalTransform, With<Marble>>,
     mut labels: Query<(&mut Transform, &mut TextFont, &MarbleLabel), Without<MarbleLabelOutline>>,

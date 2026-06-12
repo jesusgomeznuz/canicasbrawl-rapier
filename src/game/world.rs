@@ -6,7 +6,6 @@ use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
 use rand::Rng;
 use rand::RngCore;
-use rapier_bevy::{BakeEvents, BakeKey};
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
@@ -14,6 +13,7 @@ use rapier_bevy::{
     AssetsLoading, BodyType, ColliderShape, ObjectDef, SimMode, VisualAppearance, VisualDef,
     spawn_object,
 };
+use rapier_bevy::{BakeEvents, BakeKey};
 
 #[derive(Resource)]
 pub struct LevelSeed(pub u64);
@@ -221,10 +221,26 @@ pub(crate) fn spawn_level_module(
 ) -> f32 {
     let module_gap = 0.1;
     let bottom = spawn_module(
-        name, top, obstacle_color, module_seed,
-        commands, mode, asset_server, meshes, materials,
+        name,
+        top,
+        obstacle_color,
+        module_seed,
+        commands,
+        mode,
+        asset_server,
+        meshes,
+        materials,
     ) - module_gap;
-    spawn_wall_segment(top, bottom, obstacle_color, commands, mode, asset_server, meshes, materials);
+    spawn_wall_segment(
+        top,
+        bottom,
+        obstacle_color,
+        commands,
+        mode,
+        asset_server,
+        meshes,
+        materials,
+    );
     bottom
 }
 
@@ -243,8 +259,25 @@ pub(crate) fn close_level_with_finish(
     let gap_finish_to_floor = 1.0;
     let finish_y = next_top - gap_module_to_finish;
     let floor_y = finish_y - gap_finish_to_floor;
-    spawn_wall_segment(next_top, floor_y, obstacle_color, commands, mode, asset_server, meshes, materials);
-    spawn_floor(commands, mode, asset_server, meshes, materials, floor_y, obstacle_color);
+    spawn_wall_segment(
+        next_top,
+        floor_y,
+        obstacle_color,
+        commands,
+        mode,
+        asset_server,
+        meshes,
+        materials,
+    );
+    spawn_floor(
+        commands,
+        mode,
+        asset_server,
+        meshes,
+        materials,
+        floor_y,
+        obstacle_color,
+    );
     super::finish::spawn_finish_line(commands, meshes, materials, asset_server, finish_y);
 }
 
@@ -253,11 +286,17 @@ pub(crate) fn close_level_with_finish(
 /// no parche de la física del módulo).
 fn pick_module(level_gen: &mut LevelGen) -> &'static str {
     let pool: &[(&'static str, u32)] = &[
-        ("crosses", 3),
-        ("zigzag", 3),
-        ("spheres", 3),
-        ("toruses", 1),
-        ("bouncy_walls", 1),
+        ("crosses", 5),
+        ("zigzag", 5),
+        ("spheres", 5),
+        ("diamonds", 2),
+        ("mini_zigzag", 3),
+        ("more_stones", 2),
+        ("hex_stones", 3),
+        ("stones", 0),
+        ("bars", 0),
+        ("toruses", 5),
+        ("bouncy_walls", 5),
     ];
     let weighted: Vec<&'static str> = pool
         .iter()
@@ -270,6 +309,43 @@ fn pick_module(level_gen: &mut LevelGen) -> &'static str {
         let spheres_as_first = is_first_module && pick == "spheres";
         if !repeats_last && !spheres_as_first {
             return pick;
+        }
+    }
+}
+
+/// Módulos-compuerta: su función es frenar al líder EN pantalla para que el pelotón
+/// lo alcance. Fuera de pantalla harían lo contrario — detener a los rezagados sin
+/// que se vea, fabricando monopolio — así que solo ellos se apagan al salir de
+/// cuadro. Los demás módulos siguen activos siempre: si todo soltara a las
+/// rezagadas, el pelotón llegaría comprimido y la carrera se sentiría falsa.
+fn module_acts_as_gate(name: &str) -> bool {
+    matches!(name, "toruses" | "bouncy_walls" | "bars")
+}
+
+/// Tramo vertical del módulo-compuerta al que pertenece un collider (solo los
+/// módulos de [`module_acts_as_gate`] lo llevan). Cuando todo el módulo (su
+/// `bottom`) sale por arriba de la pantalla, sus colliders se apagan y las canicas
+/// de atrás caen en caída libre hasta entrar a cuadro.
+#[derive(Component, Clone, Copy)]
+pub struct ModuleSpan {
+    pub bottom: f32,
+}
+
+/// Apaga (one-way: la cámara solo baja) los colliders de los módulos que ya salieron
+/// completos por el borde superior de la pantalla, con un margen para no apagar nada
+/// visible. Física pura: en bake queda registrado en las poses, el replay no lo corre.
+pub fn disable_modules_above_screen(
+    camera: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
+    modules: Query<(Entity, &ModuleSpan), Without<ColliderDisabled>>,
+    mut commands: Commands,
+) {
+    let Ok((projection, cam_xform)) = camera.single() else {
+        return;
+    };
+    let exit_margin = 0.5;
+    for (entity, span) in &modules {
+        if super::camera::world_y_above_screen(span.bottom, exit_margin, projection, cam_xform) {
+            commands.entity(entity).insert(ColliderDisabled);
         }
     }
 }
@@ -299,6 +375,14 @@ fn spawn_module(
         });
     let trimmed_height = y_max - y_min;
     let y_offset = level_top - y_max;
+    let gate_span = module_acts_as_gate(name).then_some(ModuleSpan {
+        bottom: level_top - trimmed_height,
+    });
+    let tag_if_gate = |commands: &mut Commands, entity: Entity| {
+        if let Some(span) = gate_span {
+            commands.entity(entity).insert(span);
+        }
+    };
     for (obj_idx, obj) in objects.iter().enumerate() {
         match obj {
             WorldObject::Box {
@@ -343,6 +427,7 @@ fn spawn_module(
                     materials,
                 );
                 commands.entity(entity).insert(body_key(obj_idx));
+                tag_if_gate(commands, entity);
                 if *bouncy {
                     commands.entity(entity).insert((
                         ActiveEvents::COLLISION_EVENTS,
@@ -375,6 +460,7 @@ fn spawn_module(
                     materials,
                 );
                 commands.entity(entity).insert(body_key(obj_idx));
+                tag_if_gate(commands, entity);
                 if *bouncy {
                     commands.entity(entity).insert((
                         ActiveEvents::COLLISION_EVENTS,
@@ -416,6 +502,7 @@ fn spawn_module(
                     materials,
                 );
                 commands.entity(entity).insert(body_key(obj_idx));
+                tag_if_gate(commands, entity);
             }
             WorldObject::Image {
                 x,
@@ -461,6 +548,7 @@ fn spawn_module(
                     meshes,
                     materials,
                 );
+                tag_if_gate(commands, sensor);
                 attach_effect_marker(commands, sensor, variant);
                 spawn_spinning_icon(commands, asset_server, sensor, variant);
             }
@@ -487,6 +575,7 @@ fn spawn_module(
                     meshes,
                     materials,
                 );
+                tag_if_gate(commands, sensor);
                 attach_effect_marker(commands, sensor, variant);
                 spawn_spinning_icon(commands, asset_server, sensor, variant);
             }

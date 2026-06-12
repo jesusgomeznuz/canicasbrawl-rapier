@@ -1,0 +1,81 @@
+{
+  "objects": [
+    {
+      "kind": "Box",
+      "x": 0.4649,
+      "y": 0.4351,
+      "hx": 0.0601,
+      "hy": 0.0601,
+      "rot": 0.7854,
+      "border_radius": 0.02,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": 0.0049,
+      "y": 0.4351,
+      "hx": 0.0601,
+      "hy": 0.0601,
+      "rot": 0.7854,
+      "border_radius": 0.02,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": -0.4651,
+      "y": 0.4351,
+      "hx": 0.0601,
+      "hy": 0.0601,
+      "rot": 0.7854,
+      "border_radius": 0.02,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": 0.2649,
+      "y": 0.6851,
+      "hx": 0.0601,
+      "hy": 0.0601,
+      "rot": 0.7854,
+      "border_radius": 0.02,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": 0.2649,
+      "y": 0.1851,
+      "hx": 0.0601,
+      "hy": 0.0601,
+      "rot": 0.7854,
+      "border_radius": 0.02,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": -0.2551,
+      "y": 0.6851,
+      "hx": 0.0601,
+      "hy": 0.0601,
+      "rot": 0.7854,
+      "border_radius": 0.02,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": -0.2551,
+      "y": 0.1851,
+      "hx": 0.0601,
+      "hy": 0.0601,
+      "rot": 0.7854,
+      "border_radius": 0.02,
+      "friction": 0.0,
+      "restitution": 0.2
+    }
+  ]
+}

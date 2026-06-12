@@ -1,0 +1,36 @@
+{
+  "objects": [
+    {
+      "kind": "Box",
+      "x": 0.0,
+      "y": 0.94,
+      "hx": 0.52,
+      "hy": 0.03,
+      "rot": 0.0,
+      "angvel": [
+        0.0,
+        0.0,
+        -1.5
+      ],
+      "border_radius": 0.02,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": 0.0,
+      "y": 1.78,
+      "hx": 0.03,
+      "hy": 0.52,
+      "rot": 0.0,
+      "angvel": [
+        0.0,
+        0.0,
+        -1.5
+      ],
+      "border_radius": 0.02,
+      "friction": 0.0,
+      "restitution": 0.2
+    }
+  ]
+}

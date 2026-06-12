@@ -1,0 +1,45 @@
+{
+  "objects": [
+    {
+      "kind": "Box",
+      "x": -0.0003,
+      "y": 0.2803,
+      "hx": 0.12,
+      "hy": 0.12,
+      "rot": 0.7854,
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": 0.5497,
+      "y": 0.2803,
+      "hx": 0.12,
+      "hy": 0.12,
+      "rot": 0.7854,
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": -0.5503,
+      "y": 0.2803,
+      "hx": 0.12,
+      "hy": 0.12,
+      "rot": 0.7854,
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "EffectSlot",
+      "x": -0.35,
+      "y": 0.45,
+      "w": 0.04,
+      "h": 0.04,
+      "rot": 0.0
+    }
+  ]
+}

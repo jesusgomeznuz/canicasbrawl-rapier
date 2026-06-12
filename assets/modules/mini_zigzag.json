@@ -1,0 +1,95 @@
+{
+  "objects": [
+    {
+      "kind": "Box",
+      "x": 0.0028,
+      "y": 1.1472,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": 0.0028,
+      "y": 0.3372,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": -0.5472,
+      "y": 1.5372,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": -0.5472,
+      "y": 0.7272,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": 0.5528,
+      "y": 1.5372,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Box",
+      "x": 0.5528,
+      "y": 0.7272,
+      "hx": 0.2,
+      "hy": 0.2,
+      "rot": 0.7854,
+      "border_radius": 0.03,
+      "friction": 0.0,
+      "restitution": 0.2
+    },
+    {
+      "kind": "Image",
+      "x": 0.005,
+      "y": 0.335,
+      "w": 0.43,
+      "h": 0.43,
+      "rot": 0.0,
+      "texture": "img/canicas_logo.png"
+    },
+    {
+      "kind": "EffectSlot",
+      "x": -0.5,
+      "y": 1.95,
+      "w": 0.04,
+      "h": 0.04,
+      "rot": 0.0
+    },
+    {
+      "kind": "EffectSlot",
+      "x": 0.0,
+      "y": 1.49,
+      "w": 0.04,
+      "h": 0.04,
+      "rot": 0.0
+    }
+  ]
+}
