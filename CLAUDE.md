@@ -97,6 +97,26 @@ main
 - Cada juego pone su propia cámara, luces y `ClearColor`. Si necesita renderizar a `--record`, lee `Res<OffscreenTarget>` (recurso opcional inyectado por `RecordPlugin`).
 - La simulación corre en `FixedUpdate` a 60 steps/s (`TimestepMode::Fixed`, fijado en `engine.rs::game_app`). Toda la lógica de tiempo del juego vive en `FixedUpdate` para contar steps, no el wall-clock. En modo grabación, `RecordPlugin` usa `TimeUpdateStrategy::ManualDuration(1/60)`: cada frame avanza un step fijo y captura un frame de video (1 step = 1 frame), así la duración del MP4 == la del tiempo simulado. La aceleración de producción viene del loop headless (`run_loop(ZERO)`), no de un multiplicador de tiempo.
 
+## Contrato bake/replay (al agregar contenido o efectos)
+
+El replay NO re-simula ni re-deriva nada: todo cruza de bake a replay como datos
+(poses por BakeKey, nivel y utilería por eventos horneados). Al extender el juego:
+
+- **Módulo nuevo** (JSON via --process-modules): solo agregarlo al pool de
+  `pick_module` con su peso. Spawn, BakeKeys y evento `module` son genéricos.
+- **Más sensores freeze/shrink/swap/bouncy**: cero cambios.
+- **TIPO de efecto nuevo por colisión**: 3 pasos —
+  1. registrar su sistema de contacto en el bloque `if !is_replay` (lee CollisionEvent);
+  2. hornear su evento al disparar (`BakeEvents`, ej. `"magnet <idx> <x> <y>"`);
+  3. brazo en `replay_effects::apply_replay_effects` que reproduzca su utilería
+     (visuales/despawns — el movimiento de cuerpos viene gratis en las poses).
+- **Cuerpo RigidBody spawneado fuera de spawn_module/marbles**: asignarle una
+  `BakeKey` determinista (sin ella cae al índice de Entity, que diverge si hay
+  despawns).
+
+Si se olvida el paso 1 o las keys no cuadran, el replay hace panic con mensaje
+claro. Olvidar el paso 3 no rompe nada: se nota como utilería faltante en video.
+
 ## Cómo extender modos
 
 - **Modo nuevo del engine** (afecta a todos los juegos): añadir variante a `EngineMode` y rama en `parse_engine_mode`.
