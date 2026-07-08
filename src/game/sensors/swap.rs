@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::CollisionEvent;
 
-use crate::game::baked_events::BakedEvent;
+use crate::game::race_events::RaceEvent;
 use crate::game::camera::world_pos_on_screen;
 use crate::game::marbles::{Marble, MarbleIndex};
 
@@ -22,7 +22,7 @@ pub fn on_swap_contact(
     camera_q: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
     indices: Query<&MarbleIndex>,
     time: Res<Time>,
-    mut events: EventWriter<BakedEvent>,
+    mut events: EventWriter<RaceEvent>,
     mut commands: Commands,
 ) {
     let Ok((projection, camera_transform)) = camera_q.single() else { return };
@@ -43,7 +43,7 @@ pub fn on_swap_contact(
             info!("effect: swap @({:.2},{:.2}) t={:.2}", sensor_transform.translation.x, sensor_transform.translation.y, time.elapsed_secs());
             if let Ok((_, mut transform)) = marbles.get_mut(target) { transform.translation = partner_position; }
             if let Ok((_, mut transform)) = marbles.get_mut(partner) { transform.translation = target_position; }
-            events.write(BakedEvent::Swap {
+            events.write(RaceEvent::Swap {
                 marble_a: index_a.0,
                 marble_b: index_b.0,
                 x: sensor_transform.translation.x,

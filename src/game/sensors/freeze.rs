@@ -3,7 +3,7 @@ use bevy::sprite::ColorMaterial;
 use bevy_rapier3d::prelude::*;
 
 use super::badges::{EffectKind, EffectTimerBadge, spawn_badge};
-use crate::game::baked_events::BakedEvent;
+use crate::game::race_events::RaceEvent;
 use crate::game::camera::world_pos_on_screen;
 use crate::game::marbles::{Marble, MarbleIndex};
 
@@ -36,7 +36,7 @@ pub fn on_freeze_contact(
     camera_q: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
     indices: Query<&MarbleIndex>,
     time: Res<Time>,
-    mut events: EventWriter<BakedEvent>,
+    mut events: EventWriter<RaceEvent>,
     mut commands: Commands,
 ) {
     let duration = 2.0_f32;
@@ -53,7 +53,7 @@ pub fn on_freeze_contact(
                 RigidBody::KinematicPositionBased,
                 frozen_groups(),
             ));
-            events.write(BakedEvent::Freeze {
+            events.write(RaceEvent::Freeze {
                 marble: index.0,
                 x: sensor_transform.translation.x,
                 y: sensor_transform.translation.y,

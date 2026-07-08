@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use rapier_bevy::SimulationMode;
 
 use super::background::palette::ColorPalette;
-use super::baked_events::BakedEvent;
+use super::race_events::RaceEvent;
 use super::marbles::{Marble, MarbleIndex};
 use super::sensors::bouncy::{BounceCooldown, BouncePulse, BouncyOnContact};
 use super::sensors::freeze::{FreezeEffect, Frozen, spawn_frozen_visual};
@@ -10,14 +10,14 @@ use super::sensors::shrink::{ShrinkEffect, Shrunk};
 use super::sensors::swap::{SwapEffect, spawn_swap_rings};
 use super::world::level_generation::{close_level_with_finish, spawn_level_module};
 
-/// La escenografía del juego — única para ambos mundos. Consume BakedEvents
+/// La escenografía del juego — única para ambos mundos. Consume RaceEvents
 /// (emitidos por los contactos reales en física, o re-emitidos desde la
-/// partitura en replay) y monta todo lo visible que las poses no capturan:
+/// partitura en play) y monta todo lo visible que las poses no capturan:
 /// hielos, anillos, sensores consumidos, módulos, la meta, el pulso bouncy.
 /// El movimiento de los cuerpos nunca pasa por aquí — es de la física o de
 /// las poses, según el mundo.
-pub fn stage_baked_events(
-    mut events: EventReader<BakedEvent>,
+pub fn stage_race_events(
+    mut events: EventReader<RaceEvent>,
     marbles: Query<(Entity, &MarbleIndex), With<Marble>>,
     freeze_sensors: Query<(Entity, &Transform), With<FreezeEffect>>,
     shrink_sensors: Query<(Entity, &Transform), With<ShrinkEffect>>,
@@ -34,7 +34,7 @@ pub fn stage_baked_events(
 ) {
     for event in events.read() {
         match event {
-            BakedEvent::Freeze { marble, x, y, duration } => {
+            RaceEvent::Freeze { marble, x, y, duration } => {
                 let Some(marble) = marble_by_index(&marbles, *marble) else { continue };
                 let visual = spawn_frozen_visual(&mut commands, &mut meshes, &mut materials, marble);
                 commands.entity(marble).insert(Frozen {
@@ -43,14 +43,14 @@ pub fn stage_baked_events(
                 });
                 despawn_sensor_near(&mut commands, freeze_sensors.iter(), *x, *y);
             }
-            BakedEvent::Shrink { marble, x, y, duration } => {
+            RaceEvent::Shrink { marble, x, y, duration } => {
                 let Some(marble) = marble_by_index(&marbles, *marble) else { continue };
                 commands.entity(marble).insert(Shrunk {
                     expires_at: time.elapsed_secs() + duration,
                 });
                 despawn_sensor_near(&mut commands, shrink_sensors.iter(), *x, *y);
             }
-            BakedEvent::Swap { marble_a, marble_b, x, y } => {
+            RaceEvent::Swap { marble_a, marble_b, x, y } => {
                 let (Some(a), Some(b)) = (
                     marble_by_index(&marbles, *marble_a),
                     marble_by_index(&marbles, *marble_b),
@@ -58,19 +58,19 @@ pub fn stage_baked_events(
                 spawn_swap_rings(&mut commands, &mut meshes, &mut materials, &time, a, b);
                 despawn_sensor_near(&mut commands, swap_sensors.iter(), *x, *y);
             }
-            BakedEvent::Module { name, top, seed } => {
+            RaceEvent::Module { name, top, seed } => {
                 spawn_level_module(
                     name, *top, *seed, palette.obstacle_color(),
                     &mut commands, &mode, &asset_server, &mut meshes, &mut materials,
                 );
             }
-            BakedEvent::Finish { top } => {
+            RaceEvent::Finish { top } => {
                 close_level_with_finish(
                     *top, palette.obstacle_color(),
                     &mut commands, &mode, &asset_server, &mut meshes, &mut materials,
                 );
             }
-            BakedEvent::Bouncy { x, y, amplitude } => {
+            RaceEvent::Bouncy { x, y, amplitude } => {
                 let target = Vec2::new(*x, *y);
                 let hit = bouncys.iter()
                     .filter(|(entity, _)| !pulsing.contains(*entity))

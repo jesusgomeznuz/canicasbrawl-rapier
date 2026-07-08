@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{CollisionEvent, Velocity};
 
-use crate::game::baked_events::BakedEvent;
+use crate::game::race_events::RaceEvent;
 
 #[derive(Component)]
 pub struct BouncyOnContact;
@@ -22,7 +22,7 @@ pub fn trigger_bouncy_pulse(
     bouncy: Query<&Transform, With<BouncyOnContact>>,
     already_pulsing: Query<(), Or<(With<BouncePulse>, With<BounceCooldown>)>>,
     movers: Query<(&Transform, &Velocity)>,
-    mut events: EventWriter<BakedEvent>,
+    mut events: EventWriter<RaceEvent>,
 ) {
     let base_amplitude = 0.04_f32;
     let speed_scale = 0.05_f32;
@@ -38,7 +38,7 @@ pub fn trigger_bouncy_pulse(
                     (-velocity.linvel.dot(direction)).max(0.0)
                 }).unwrap_or(0.0);
                 let amplitude = (base_amplitude + closing * speed_scale).min(max_amplitude);
-                events.write(BakedEvent::Bouncy {
+                events.write(RaceEvent::Bouncy {
                     x: sphere_transform.translation.x,
                     y: sphere_transform.translation.y,
                     amplitude,

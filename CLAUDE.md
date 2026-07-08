@@ -31,7 +31,6 @@ cargo run -- --simulate 60 --slots 9 --seed 7       # casting: SOLO física, can
 cargo run -- --record 60 --play outputs/simulation_60s.timeline --seed 7 --characters A,B,...
                                                     # render desde timeline; el nombre i-ésimo viste al slot_i
 # Regla: simulate y record de la MISMA duración y seed (la meta depende de la duración)
-# (--bake y --replay siguen aceptados como alias históricos)
 
 # Bench vive en el engine, no en el juego
 cd ../rapier-bevy && cargo run -- --bench falling-spheres 200
@@ -71,8 +70,8 @@ src/
                        / after_frame_update / on_exit + match ¿replay?
   process_modules.rs   raw JSON Figma → módulo final
   game/
-    baked_events.rs    ADUANA de eventos: enum BakedEvent, payload+parse juntos
-    staging.rs         escenografía única de ambos mundos (consume BakedEvent)
+    race_events.rs     ADUANA de eventos: enum RaceEvent, payload+parse juntos
+    staging.rs         escenografía única de ambos mundos (consume RaceEvent)
     level.rs           load_module → ModuleData (aduana del JSON de módulos)
     marbles.rs         la canica: cuerpo, mesh, cara, etiquetas
     roster.rs          casting: quién corre (build_roster / slots_roster)
@@ -110,28 +109,29 @@ main
 
 ## Contrato bake/replay (al agregar contenido o efectos)
 
-El replay NO re-simula ni re-deriva nada: todo cruza de bake a replay como datos
-(poses por BakeKey, eventos tipados para lo demás). El contrato universal vive en
-`../rapier-bevy/src/timeline.rs` (Timeline, Pose, BakeKey); el vocabulario del
-juego en `src/game/baked_events.rs` (enum BakedEvent — payload y parse juntos).
+Play NO re-simula ni re-deriva nada: todo cruza de simulate a play como datos
+(poses por TimelineKey, eventos tipados para lo demás). El contrato universal
+vive en `../rapier-bevy/src/timeline.rs` (Timeline, Pose, TimelineKey); el
+vocabulario del juego en `src/game/race_events.rs` (enum RaceEvent — payload y
+parse juntos).
 
 Los eventos son event-sourced: los contactos reales (física) y la partitura
-(replay) emiten el MISMO `BakedEvent` de Bevy; `staging::stage_baked_events`
-monta la escenografía igual en ambos mundos, y `record_baked_events` los hornea
-solo. Al extender el juego:
+(play) emiten el MISMO `RaceEvent` de Bevy; `staging::stage_race_events` monta
+la escenografía igual en ambos mundos, y `send_race_events_to_timeline` los
+escribe solo. Al extender el juego:
 
 - **Módulo nuevo** (JSON via --process-modules): solo agregarlo al pool de
   `pick_module` con su peso. Spawn, BakeKeys y evento `Module` son genéricos.
 - **Más sensores freeze/shrink/swap/bouncy**: cero cambios.
 - **TIPO de efecto nuevo por colisión**: 3 pasos —
-  1. variante nueva en `BakedEvent` (con su payload y su parse);
+  1. variante nueva en `RaceEvent` (con su payload y su parse);
   2. sistema de contacto en `react_to_real_collisions` que aplica SOLO la parte
      física (RigidBody, grupos, teleports) y emite la variante;
-  3. brazo en `staging::stage_baked_events` con su utilería (visuales/despawns —
+  3. brazo en `staging::stage_race_events` con su utilería (visuales/despawns —
      el movimiento de cuerpos viene gratis en las poses).
 - **Cuerpo RigidBody spawneado fuera de spawn_module/marbles**: asignarle una
-  `BakeKey` determinista (sin ella cae al índice de Entity, que diverge si hay
-  despawns).
+  `TimelineKey` determinista (sin ella cae al índice de Entity, que diverge si
+  hay despawns).
 
 Nada falla en silencio: sin el brazo de escenografía el match del enum no
 compila; un payload ilegible o keys que no cuadran hacen panic con mensaje.

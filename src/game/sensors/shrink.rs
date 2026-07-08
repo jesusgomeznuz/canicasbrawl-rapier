@@ -3,7 +3,7 @@ use bevy::sprite::ColorMaterial;
 use bevy_rapier3d::prelude::CollisionEvent;
 
 use super::badges::{EffectKind, EffectTimerBadge, spawn_badge};
-use crate::game::baked_events::BakedEvent;
+use crate::game::race_events::RaceEvent;
 use crate::game::camera::world_pos_on_screen;
 use crate::game::marbles::{Marble, MarbleIndex};
 
@@ -25,7 +25,7 @@ pub fn on_shrink_contact(
     camera_q: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
     indices: Query<&MarbleIndex>,
     time: Res<Time>,
-    mut events: EventWriter<BakedEvent>,
+    mut events: EventWriter<RaceEvent>,
 ) {
     let duration = 5.0_f32;
     let factor   = 0.5_f32;
@@ -39,7 +39,7 @@ pub fn on_shrink_contact(
                 let Ok(index) = indices.get(target) else { continue };
                 info!("effect: shrink @({:.2},{:.2}) t={:.2}", sensor_transform.translation.x, sensor_transform.translation.y, time.elapsed_secs());
                 transform.scale = Vec3::splat(factor);
-                events.write(BakedEvent::Shrink {
+                events.write(RaceEvent::Shrink {
                     marble: index.0,
                     x: sensor_transform.translation.x,
                     y: sensor_transform.translation.y,

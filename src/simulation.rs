@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy_rapier3d::plugin::PhysicsSet;
 use rapier_bevy::{
-    GameAppConfig, ReplayEvent, SimulationMode, physics_enabled, random_physics_game_app,
+    GameAppConfig, PlayEvent, SimulationMode, physics_enabled, random_physics_game_app,
     record_duration, simulate_duration,
 };
 
@@ -62,8 +62,8 @@ fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorP
 }
 
 fn on_step(app: &mut App) {
-    app.add_event::<game::baked_events::BakedEvent>();
-    app.add_event::<ReplayEvent>();
+    app.add_event::<game::race_events::RaceEvent>();
+    app.add_event::<PlayEvent>();
     app.add_systems(
         FixedUpdate,
         (
@@ -74,9 +74,9 @@ fn on_step(app: &mut App) {
             )
                 .chain(),
             (
-                game::baked_events::reemit_baked_events,
-                game::baked_events::record_baked_events,
-                game::staging::stage_baked_events,
+                game::race_events::emit_race_events_from_timeline,
+                game::race_events::send_race_events_to_timeline,
+                game::staging::stage_race_events,
             )
                 .chain(),
         )
@@ -145,7 +145,7 @@ fn react_to_real_collisions(app: &mut App) {
             game::sensors::bouncy::trigger_bouncy_pulse,
         )
             .after(PhysicsSet::Writeback)
-            .before(game::baked_events::reemit_baked_events),
+            .before(game::race_events::emit_race_events_from_timeline),
     );
 }
 

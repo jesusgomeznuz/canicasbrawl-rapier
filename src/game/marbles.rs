@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use rapier_bevy::{
-    AssetsLoading, BakeKey, BodyType, ColliderShape, LockedAxes, ObjectDef, SimulationMode, spawn_object,
+    AssetsLoading, BodyType, ColliderShape, LockedAxes, ObjectDef, SimulationMode, TimelineKey, spawn_object,
 };
 
 use super::roster::MarbleConfig;
@@ -49,7 +49,7 @@ pub fn spawn_marbles(
             *position,
             color,
         );
-        commands.entity(entity).insert((MarbleIndex(i), BakeKey(i as u64)));
+        commands.entity(entity).insert((MarbleIndex(i), TimelineKey(i as u64)));
         spawn_marble_label(commands, asset_server, entity, &config.nickname);
         if let Some(image) = &config.image {
             attach_marble_face(

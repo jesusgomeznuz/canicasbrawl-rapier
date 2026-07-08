@@ -5,7 +5,7 @@ use rand::RngCore;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rapier_bevy::{
-    BakeKey, BodyType, ColliderShape, ObjectDef, SimulationMode, VisualDef, spawn_object,
+    BodyType, ColliderShape, ObjectDef, SimulationMode, TimelineKey, VisualDef, spawn_object,
 };
 
 use super::pickups::{
@@ -13,7 +13,7 @@ use super::pickups::{
     spawn_spinning_icon,
 };
 use super::structures::{spawn_floor, spawn_wall_segment, tinted_white};
-use crate::game::baked_events::BakedEvent;
+use crate::game::race_events::RaceEvent;
 use crate::game::level::{ModuleData, WorldObject, load_module};
 use crate::game::marbles::Marble;
 
@@ -78,7 +78,7 @@ pub fn generate_level(
     sim_time: Res<Time<Fixed>>,
     marbles: Query<&Transform, With<Marble>>,
     mut level_gen: ResMut<LevelGen>,
-    mut events: EventWriter<BakedEvent>,
+    mut events: EventWriter<RaceEvent>,
 ) {
     let Some(leader_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else {
         return;
@@ -88,7 +88,7 @@ pub fn generate_level(
             let name = pick_module(&mut level_gen);
             let top = level_gen.next_top;
             let module_seed = level_gen.rng.next_u64();
-            events.write(BakedEvent::Module {
+            events.write(RaceEvent::Module {
                 name: name.to_string(),
                 top,
                 seed: module_seed,
@@ -98,7 +98,7 @@ pub fn generate_level(
             level_gen.modules_spawned += 1;
         }
         LevelGenerationAction::SpawnFinishLine => {
-            events.write(BakedEvent::Finish { top: level_gen.next_top });
+            events.write(RaceEvent::Finish { top: level_gen.next_top });
             level_gen.finish_spawned = true;
         }
         LevelGenerationAction::DoNothing => {}
@@ -254,7 +254,7 @@ fn spawn_module(
     materials: &mut Assets<StandardMaterial>,
 ) -> f32 {
     let rng = &mut SmallRng::seed_from_u64(module_seed);
-    let body_key = |obj_idx: usize| BakeKey(module_seed ^ ((obj_idx as u64 + 1) << 32));
+    let body_key = |obj_idx: usize| TimelineKey(module_seed ^ ((obj_idx as u64 + 1) << 32));
     let ModuleData { objects, .. } = load_module(name);
     let (y_min, y_max) = objects
         .iter()

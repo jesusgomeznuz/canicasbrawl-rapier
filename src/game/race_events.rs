@@ -1,23 +1,24 @@
-//! La partitura de canicasbrawl — todo lo que cruza del bake al replay:
-//!   · movimiento:  poses por BakeKey, capturadas solas por el engine (timeline.rs)
+//! La partitura de canicasbrawl — todo lo que cruza de simulate a play:
+//!   · movimiento:  poses por TimelineKey, capturadas solas por el engine (timeline.rs)
 //!   · nivel:       eventos Module/Finish — receta: nombre + top + seed
 //!   · utilería:    eventos Freeze/Shrink/Swap/Bouncy
-//!   · identidades: NO viajan — el bake es anónimo, el cast viste en replay
+//!   · identidades: NO viajan — la simulación es anónima, el cast viste en play
 //!   · liderazgo:   voice_tracker.json — para elegir carrera, no para reproducirla
 //!
 //! Este enum es la aduana de la pista de eventos: escribir (`payload`) y leer
 //! (`parse`) viven juntos — una sola fuente de verdad del formato del sobre.
 //!
 //! También circula como evento vivo de Bevy: los contactos reales lo emiten en
-//! física y `reemit_baked_events` lo re-emite en replay — la escenografía
-//! (staging.rs) lo consume igual en ambos mundos, y `record_baked_events` lo
-//! graba al bake sin que ningún sensor arme strings a mano.
+//! física y `emit_race_events_from_timeline` lo re-emite en play — la
+//! escenografía (staging.rs) lo consume igual en ambos mundos, y
+//! `send_race_events_to_timeline` lo escribe a la partitura en simulate sin
+//! que ningún sensor arme strings a mano.
 
 use bevy::prelude::*;
-use rapier_bevy::{BakeEvents, ReplayEvent};
+use rapier_bevy::{PlayEvent, TimelineEvents};
 
 #[derive(Event, Clone)]
-pub enum BakedEvent {
+pub enum RaceEvent {
     Freeze { marble: usize, x: f32, y: f32, duration: f32 },
     Shrink { marble: usize, x: f32, y: f32, duration: f32 },
     Swap { marble_a: usize, marble_b: usize, x: f32, y: f32 },
@@ -26,82 +27,82 @@ pub enum BakedEvent {
     Finish { top: f32 },
 }
 
-impl BakedEvent {
+impl RaceEvent {
     pub fn payload(&self) -> String {
         match self {
-            BakedEvent::Freeze { marble, x, y, duration } => {
+            RaceEvent::Freeze { marble, x, y, duration } => {
                 format!("freeze {marble} {x:.3} {y:.3} {duration}")
             }
-            BakedEvent::Shrink { marble, x, y, duration } => {
+            RaceEvent::Shrink { marble, x, y, duration } => {
                 format!("shrink {marble} {x:.3} {y:.3} {duration}")
             }
-            BakedEvent::Swap { marble_a, marble_b, x, y } => {
+            RaceEvent::Swap { marble_a, marble_b, x, y } => {
                 format!("swap {marble_a} {marble_b} {x:.3} {y:.3}")
             }
-            BakedEvent::Bouncy { x, y, amplitude } => format!("bouncy {x} {y} {amplitude}"),
-            BakedEvent::Module { name, top, seed } => format!("module {name} {top} {seed}"),
-            BakedEvent::Finish { top } => format!("finish {top}"),
+            RaceEvent::Bouncy { x, y, amplitude } => format!("bouncy {x} {y} {amplitude}"),
+            RaceEvent::Module { name, top, seed } => format!("module {name} {top} {seed}"),
+            RaceEvent::Finish { top } => format!("finish {top}"),
         }
     }
 
-    pub fn parse(payload: &str) -> BakedEvent {
-        BakedEvent::try_parse(payload).unwrap_or_else(|| {
-            panic!("evento horneado ilegible: '{payload}' — bake y replay hablan idiomas distintos")
+    pub fn parse(payload: &str) -> RaceEvent {
+        RaceEvent::try_parse(payload).unwrap_or_else(|| {
+            panic!("evento de carrera ilegible: '{payload}' — simulate y play hablan idiomas distintos")
         })
     }
 
-    fn try_parse(payload: &str) -> Option<BakedEvent> {
+    fn try_parse(payload: &str) -> Option<RaceEvent> {
         let parts: Vec<&str> = payload.split_whitespace().collect();
         match parts.as_slice() {
-            ["freeze", marble, x, y, duration] => Some(BakedEvent::Freeze {
+            ["freeze", marble, x, y, duration] => Some(RaceEvent::Freeze {
                 marble: marble.parse().ok()?,
                 x: x.parse().ok()?,
                 y: y.parse().ok()?,
                 duration: duration.parse().ok()?,
             }),
-            ["shrink", marble, x, y, duration] => Some(BakedEvent::Shrink {
+            ["shrink", marble, x, y, duration] => Some(RaceEvent::Shrink {
                 marble: marble.parse().ok()?,
                 x: x.parse().ok()?,
                 y: y.parse().ok()?,
                 duration: duration.parse().ok()?,
             }),
-            ["swap", marble_a, marble_b, x, y] => Some(BakedEvent::Swap {
+            ["swap", marble_a, marble_b, x, y] => Some(RaceEvent::Swap {
                 marble_a: marble_a.parse().ok()?,
                 marble_b: marble_b.parse().ok()?,
                 x: x.parse().ok()?,
                 y: y.parse().ok()?,
             }),
-            ["bouncy", x, y, amplitude] => Some(BakedEvent::Bouncy {
+            ["bouncy", x, y, amplitude] => Some(RaceEvent::Bouncy {
                 x: x.parse().ok()?,
                 y: y.parse().ok()?,
                 amplitude: amplitude.parse().ok()?,
             }),
-            ["module", name, top, seed] => Some(BakedEvent::Module {
+            ["module", name, top, seed] => Some(RaceEvent::Module {
                 name: name.to_string(),
                 top: top.parse().ok()?,
                 seed: seed.parse().ok()?,
             }),
-            ["finish", top] => Some(BakedEvent::Finish { top: top.parse().ok()? }),
+            ["finish", top] => Some(RaceEvent::Finish { top: top.parse().ok()? }),
             _ => None,
         }
     }
 }
 
-pub fn record_baked_events(
-    mut events: EventReader<BakedEvent>,
-    mut bake: Option<ResMut<BakeEvents>>,
+pub fn send_race_events_to_timeline(
+    mut events: EventReader<RaceEvent>,
+    mut timeline: Option<ResMut<TimelineEvents>>,
 ) {
-    let Some(bake) = bake.as_deref_mut() else { return };
+    let Some(timeline) = timeline.as_deref_mut() else { return };
     for event in events.read() {
-        bake.0.push(event.payload());
+        timeline.0.push(event.payload());
     }
 }
 
-pub fn reemit_baked_events(
-    mut wire: EventReader<ReplayEvent>,
-    mut events: EventWriter<BakedEvent>,
+pub fn emit_race_events_from_timeline(
+    mut wire: EventReader<PlayEvent>,
+    mut events: EventWriter<RaceEvent>,
 ) {
-    for ReplayEvent(payload) in wire.read() {
-        events.write(BakedEvent::parse(payload));
+    for PlayEvent(payload) in wire.read() {
+        events.write(RaceEvent::parse(payload));
     }
 }

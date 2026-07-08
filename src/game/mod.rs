@@ -1,5 +1,5 @@
 pub mod background;
-pub mod baked_events;
+pub mod race_events;
 pub mod camera;
 pub mod finish;
 pub mod hud;
