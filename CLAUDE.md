@@ -68,7 +68,10 @@ src/
   args.rs              parseo CLI → Command
   simulation.rs        arma el App por fases: on_start / on_step / on_frame_update
                        / after_frame_update / on_exit + if ¿no hay timeline que reproducir?
-  process_modules.rs   raw JSON Figma → módulo final
+  process_modules/     el convertidor del editor (espejo escritor de spawn_module)
+    mod.rs             run + transform — el flowchart, con las aduanas RawModule/WorldObject
+    shapes.rs          un from_raw por forma + parseo de tags del nombre
+    torus_assets.rs    fábrica de .obj/.compound del torus
   game/
     race_events.rs     ADUANA de eventos: enum RaceEvent, payload+parse juntos
     staging.rs         escenografía única de ambos mundos (consume RaceEvent)
