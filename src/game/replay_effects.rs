@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use rapier_bevy::{ReplayEvent, SimMode};
+use rapier_bevy::{ReplayEvent, SimulationMode};
 
 use super::background::ColorPalette;
 use super::bouncy::{BounceCooldown, BouncePulse, BouncyOnContact};
@@ -24,7 +24,7 @@ pub fn apply_replay_effects(
     swap_sensors: Query<(Entity, &Transform), With<SwapEffect>>,
     bouncys: Query<(Entity, &Transform), With<BouncyOnContact>>,
     pulsing: Query<(), Or<(With<BouncePulse>, With<BounceCooldown>)>>,
-    mode: Res<SimMode>,
+    mode: Res<SimulationMode>,
     palette: Res<ColorPalette>,
     asset_server: Res<AssetServer>,
     time: Res<Time>,

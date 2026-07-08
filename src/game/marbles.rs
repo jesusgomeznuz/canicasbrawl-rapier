@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use rapier_bevy::{
-    AssetsLoading, BakeKey, BodyType, ColliderShape, LockedAxes, ObjectDef, SimMode, spawn_object,
+    AssetsLoading, BakeKey, BodyType, ColliderShape, LockedAxes, ObjectDef, SimulationMode, spawn_object,
 };
 
 #[derive(Component)]
@@ -81,7 +81,7 @@ fn character_config(name: &str) -> Result<MarbleConfig, String> {
 
 pub fn spawn_marbles(
     commands: &mut Commands,
-    mode: &SimMode,
+    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -157,7 +157,7 @@ fn spawn_grid(cx: f32, cy: f32) -> [(f32, f32); 9] {
 
 fn spawn_marble_body(
     commands: &mut Commands,
-    mode: &SimMode,
+    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,

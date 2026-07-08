@@ -10,7 +10,7 @@ use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rapier_bevy::{
-    AssetsLoading, BodyType, ColliderShape, ObjectDef, SimMode, VisualAppearance, VisualDef,
+    AssetsLoading, BodyType, ColliderShape, ObjectDef, SimulationMode, VisualAppearance, VisualDef,
     spawn_object,
 };
 use rapier_bevy::{BakeEvents, BakeKey};
@@ -35,7 +35,7 @@ fn tinted_white(color: Color) -> VisualDef {
 
 pub fn setup(
     mut commands: Commands,
-    mode: Res<SimMode>,
+    mode: Res<SimulationMode>,
     seed: Res<LevelSeed>,
     finish_target: Res<FinishTarget>,
     roster: Res<super::marbles::Roster>,
@@ -146,7 +146,7 @@ pub fn generate_level(
     marbles: Query<&Transform, With<Marble>>,
     mut level_gen: ResMut<LevelGen>,
     mut commands: Commands,
-    mode: Res<SimMode>,
+    mode: Res<SimulationMode>,
     palette: Res<ColorPalette>,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -214,7 +214,7 @@ pub(crate) fn spawn_level_module(
     module_seed: u64,
     obstacle_color: Color,
     commands: &mut Commands,
-    mode: &SimMode,
+    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -250,7 +250,7 @@ pub(crate) fn close_level_with_finish(
     next_top: f32,
     obstacle_color: Color,
     commands: &mut Commands,
-    mode: &SimMode,
+    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -356,7 +356,7 @@ fn spawn_module(
     obstacle_color: Color,
     module_seed: u64,
     commands: &mut Commands,
-    mode: &SimMode,
+    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -632,7 +632,7 @@ fn spawn_invisible_sensor(
     w: f32,
     h: f32,
     rot: f32,
-    mode: &SimMode,
+    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -703,7 +703,7 @@ fn icon_tuning_for(variant: &str) -> (Vec3, f32, f32) {
 
 fn spawn_floor(
     commands: &mut Commands,
-    mode: &SimMode,
+    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -743,7 +743,7 @@ fn spawn_wall_segment(
     bottom: f32,
     obstacle_color: Color,
     commands: &mut Commands,
-    mode: &SimMode,
+    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
