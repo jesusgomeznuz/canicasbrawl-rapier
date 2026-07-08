@@ -91,31 +91,29 @@ pub fn try_unfreeze(
     other_marbles: Query<(), (With<Marble>, Without<Frozen>)>,
     mut commands: Commands,
 ) {
-    let Ok(rapier_context) = rapier.single() else { return };
     for (entity, frozen_state, collider, transform) in &frozen {
         if time.elapsed_secs() < frozen_state.expires_at { continue; }
-        let blocked = std::cell::Cell::new(false);
-        let filter = QueryFilter::default().exclude_collider(entity);
-        rapier_context.intersect_shape(
-            transform.translation,
-            transform.rotation,
-            &*collider.raw,
-            filter,
-            |hit| {
-                if other_marbles.contains(hit) {
-                    blocked.set(true);
-                    return false;
-                }
-                true
-            },
-        );
-        if !blocked.get() {
-            commands.entity(frozen_state.visual).despawn();
-            commands.entity(entity).insert((
-                RigidBody::Dynamic,
-                marble_groups(),
-            )).remove::<Frozen>();
+        if let Ok(rapier_context) = rapier.single() {
+            let blocked = std::cell::Cell::new(false);
+            let filter = QueryFilter::default().exclude_collider(entity);
+            rapier_context.intersect_shape(
+                transform.translation,
+                transform.rotation,
+                &*collider.raw,
+                filter,
+                |hit| {
+                    if other_marbles.contains(hit) {
+                        blocked.set(true);
+                        return false;
+                    }
+                    true
+                },
+            );
+            if blocked.get() { continue; }
+            commands.entity(entity).insert((RigidBody::Dynamic, marble_groups()));
         }
+        commands.entity(frozen_state.visual).despawn();
+        commands.entity(entity).remove::<Frozen>();
     }
 }
 

@@ -86,22 +86,6 @@ pub fn stage_baked_events(
     }
 }
 
-/// try_unfreeze no opera en replay (consulta el contexto de Rapier, que ahí no
-/// existe); este reemplazo solo expira el visual del hielo.
-pub fn expire_replay_freezes(
-    time: Res<Time>,
-    frozen: Query<(Entity, &Frozen), With<Marble>>,
-    mut commands: Commands,
-) {
-    for (marble, frozen_state) in &frozen {
-        if time.elapsed_secs() < frozen_state.expires_at {
-            continue;
-        }
-        commands.entity(frozen_state.visual).despawn();
-        commands.entity(marble).remove::<Frozen>();
-    }
-}
-
 fn marble_by_index(
     marbles: &Query<(Entity, &MarbleIndex), With<Marble>>,
     want: usize,

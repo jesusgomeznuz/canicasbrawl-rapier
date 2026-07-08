@@ -2,8 +2,8 @@ use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy_rapier3d::plugin::PhysicsSet;
 use rapier_bevy::{
-    GameAppConfig, SimulationMode, bake_duration, random_physics_game_app, record_duration,
-    replay_path,
+    GameAppConfig, ReplayEvent, SimulationMode, bake_duration, physics_enabled,
+    random_physics_game_app, record_duration,
 };
 
 use crate::args::RosterSpec;
@@ -63,6 +63,7 @@ fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorP
 
 fn on_step(app: &mut App) {
     app.add_event::<game::baked_events::BakedEvent>();
+    app.add_event::<ReplayEvent>();
     app.add_systems(
         FixedUpdate,
         (
@@ -87,9 +88,21 @@ fn on_step(app: &mut App) {
             .after(PhysicsSet::Writeback),
     );
 
-    match replay_path() {
-        Some(_) => reenact_the_baked_race(app),
-        None => react_to_real_collisions(app),
+    // La banda de eventos es igual en todos los mundos: re-emitir la partitura
+    // (buzón vacío si no hay), hornear (sin BakeEvents no hay dónde), escenificar.
+    app.add_systems(
+        FixedUpdate,
+        (
+            game::baked_events::reemit_baked_events,
+            game::baked_events::record_baked_events,
+            game::staging::stage_baked_events,
+        )
+            .chain()
+            .after(PhysicsSet::Writeback),
+    );
+
+    if physics_enabled() {
+        react_to_real_collisions(app);
     }
 }
 
@@ -129,37 +142,15 @@ fn react_to_real_collisions(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (
-            (
-                game::world::level_generation::generate_level,
-                game::world::level_generation::disable_modules_above_screen,
-                game::sensors::freeze::on_freeze_contact,
-                game::sensors::shrink::on_shrink_contact,
-                game::sensors::swap::on_swap_contact,
-                game::sensors::bouncy::trigger_bouncy_pulse,
-            ),
-            (
-                game::baked_events::record_baked_events,
-                game::staging::stage_baked_events,
-            ),
+            game::world::level_generation::generate_level,
+            game::world::level_generation::disable_modules_above_screen,
+            game::sensors::freeze::on_freeze_contact,
+            game::sensors::shrink::on_shrink_contact,
+            game::sensors::swap::on_swap_contact,
+            game::sensors::bouncy::trigger_bouncy_pulse,
         )
-            .chain()
-            .after(PhysicsSet::Writeback),
-    );
-}
-
-fn reenact_the_baked_race(app: &mut App) {
-    app.add_systems(
-        FixedUpdate,
-        (
-            game::baked_events::reemit_baked_events,
-            game::staging::stage_baked_events,
-        )
-            .chain()
-            .after(PhysicsSet::Writeback),
-    )
-    .add_systems(
-        FixedUpdate,
-        game::staging::expire_replay_freezes.after(PhysicsSet::Writeback),
+            .after(PhysicsSet::Writeback)
+            .before(game::baked_events::reemit_baked_events),
     );
 }
 
