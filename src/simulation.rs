@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy_rapier3d::plugin::PhysicsSet;
 use rapier_bevy::{
-    GameAppConfig, PlayEvent, SimulationMode, no_timeline_is_playing, random_physics_game_app,
+    GameAppConfig, PlayEvent, SimulationMode, play_timeline, random_physics_game_app,
     record_duration, write_timeline_duration,
 };
 
@@ -96,7 +96,7 @@ fn on_step(app: &mut App) {
             .after(PhysicsSet::Writeback),
     );
 
-    if no_timeline_is_playing() {
+    if play_timeline().is_none() {
         react_to_real_collisions(app);
     }
 }
