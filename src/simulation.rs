@@ -3,7 +3,7 @@ use bevy::transform::TransformSystem;
 use bevy_rapier3d::plugin::PhysicsSet;
 use rapier_bevy::{
     GameAppConfig, PlayEvent, SimulationMode, physics_enabled, random_physics_game_app,
-    record_duration, simulate_duration,
+    record_duration, write_timeline_duration,
 };
 
 use crate::args::RosterSpec;
@@ -163,7 +163,7 @@ fn resolve_roster(spec: RosterSpec) -> Vec<MarbleConfig> {
 
 fn finish_target_secs() -> f32 {
     let video_secs = record_duration()
-        .or_else(simulate_duration)
+        .or_else(write_timeline_duration)
         .map(|d| d as f32)
         .unwrap_or(60.0);
     let tail_of_falling_marbles_secs = 12.0;

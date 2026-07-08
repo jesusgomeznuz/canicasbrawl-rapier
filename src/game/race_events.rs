@@ -1,8 +1,8 @@
-//! La partitura de canicasbrawl — todo lo que cruza de simulate a play:
+//! La partitura de canicasbrawl — todo lo que cruza de write-timeline a play:
 //!   · movimiento:  poses por TimelineKey, capturadas solas por el engine (timeline.rs)
 //!   · nivel:       eventos Module/Finish — receta: nombre + top + seed
 //!   · utilería:    eventos Freeze/Shrink/Swap/Bouncy
-//!   · identidades: NO viajan — la simulación es anónima, el cast viste en play
+//!   · identidades: NO viajan — la timeline se escribe anónima, el cast viste en play
 //!   · liderazgo:   voice_tracker.json — para elegir carrera, no para reproducirla
 //!
 //! Este enum es la aduana de la pista de eventos: escribir (`payload`) y leer
@@ -11,8 +11,8 @@
 //! También circula como evento vivo de Bevy: los contactos reales lo emiten en
 //! física y `emit_race_events_from_timeline` lo re-emite en play — la
 //! escenografía (staging.rs) lo consume igual en ambos mundos, y
-//! `send_race_events_to_timeline` lo escribe a la partitura en simulate sin
-//! que ningún sensor arme strings a mano.
+//! `send_race_events_to_timeline` lo escribe a la partitura en --write-timeline
+//! sin que ningún sensor arme strings a mano.
 
 use bevy::prelude::*;
 use rapier_bevy::{PlayEvent, TimelineEvents};
@@ -47,7 +47,7 @@ impl RaceEvent {
 
     pub fn parse(payload: &str) -> RaceEvent {
         RaceEvent::try_parse(payload).unwrap_or_else(|| {
-            panic!("evento de carrera ilegible: '{payload}' — simulate y play hablan idiomas distintos")
+            panic!("evento de carrera ilegible: '{payload}' — write-timeline y play hablan idiomas distintos")
         })
     }
 

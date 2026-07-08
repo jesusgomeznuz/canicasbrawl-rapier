@@ -27,10 +27,10 @@ cargo run -- --sim-raw                              # física sin precomputing (
 # Modificadores (combinables con Sim)
 cargo run -- --debug                                # activa RapierDebugRenderPlugin
 cargo run -- --record 30                            # graba 30 s → outputs/record_30s.mp4
-cargo run -- --simulate 60 --slots 9 --seed 7       # casting: SOLO física, canicas anónimas → outputs/simulation_60s.timeline + voice_tracker con slot_N
+cargo run -- --write-timeline 60 --slots 9 --seed 7 # casting: SOLO física, canicas anónimas → outputs/simulation_60s.timeline + voice_tracker con slot_N
 cargo run -- --record 60 --play outputs/simulation_60s.timeline --seed 7 --characters A,B,...
                                                     # render desde timeline; el nombre i-ésimo viste al slot_i
-# Regla: simulate y record de la MISMA duración y seed (la meta depende de la duración)
+# Regla: write-timeline y record de la MISMA duración y seed (la meta depende de la duración)
 
 # Bench vive en el engine, no en el juego
 cd ../rapier-bevy && cargo run -- --bench falling-spheres 200
@@ -109,7 +109,7 @@ main
 
 ## Contrato bake/replay (al agregar contenido o efectos)
 
-Play NO re-simula ni re-deriva nada: todo cruza de simulate a play como datos
+Play NO re-simula ni re-deriva nada: todo cruza de write-timeline a play como datos
 (poses por TimelineKey, eventos tipados para lo demás). El contrato universal
 vive en `../rapier-bevy/src/timeline.rs` (Timeline, Pose, TimelineKey); el
 vocabulario del juego en `src/game/race_events.rs` (enum RaceEvent — payload y
