@@ -65,16 +65,26 @@ El engine no conoce al juego. El juego consume el engine vía `engine::game_app(
 ```
 src/
   main.rs              parse_command + match top-level (4 modos)
-  game/                simulación
-    mod.rs             CanicasBrawlPlugin + game::run(mode)
-    world.rs           spawn_level, paredes, suelo
-    level.rs           load_module → ModuleData
-    marbles.rs         spawn_marbles, MarbleName, MarbleLabel
-    camera.rs          spawn_camera_and_lights, follow_lowest, update_labels
-  production/          post-simulación
+  args.rs              parseo CLI → Command
+  simulation.rs        arma el App por fases: on_start / on_step / on_frame_update
+                       / after_frame_update / on_exit + match ¿replay?
+  process_modules.rs   raw JSON Figma → módulo final
+  game/
+    baked_events.rs    ADUANA de eventos: enum BakedEvent, payload+parse juntos
+    staging.rs         escenografía única de ambos mundos (consume BakedEvent)
+    level.rs           load_module → ModuleData (aduana del JSON de módulos)
+    marbles.rs         la canica: cuerpo, mesh, cara, etiquetas
+    roster.rs          casting: quién corre (build_roster / slots_roster)
+    camera.rs          cámara, luces y checks de encuadre
+    finish.rs          meta y orden de llegada
+    leader.rs          quién va ganando + su corona
+    hud.rs             overlay 2D
+    world/             setup, level_generation, pickups, structures
+    sensors/           freeze, shrink, swap, bouncy + badges e icons compartidos
+    background/        palette, sky, stars, clouds
+  production/
     voice_tracker.rs   track_race_leader, save_voice_tracker_on_exit
-  content/             pipeline editor
-    process_modules.rs raw JSON Figma → módulo final
+    stall_detector.rs  watchdog wall-clock del solver
 ```
 
 ## Flujo de arranque
@@ -100,24 +110,30 @@ main
 ## Contrato bake/replay (al agregar contenido o efectos)
 
 El replay NO re-simula ni re-deriva nada: todo cruza de bake a replay como datos
-(poses por BakeKey, nivel y utilería por eventos horneados). El contrato de datos
-vive en `../rapier-bevy/src/timeline.rs` (Timeline, Pose, BakeKey, BakeEvents,
-ReplayEvent). Al extender el juego:
+(poses por BakeKey, eventos tipados para lo demás). El contrato universal vive en
+`../rapier-bevy/src/timeline.rs` (Timeline, Pose, BakeKey); el vocabulario del
+juego en `src/game/baked_events.rs` (enum BakedEvent — payload y parse juntos).
+
+Los eventos son event-sourced: los contactos reales (física) y la partitura
+(replay) emiten el MISMO `BakedEvent` de Bevy; `staging::stage_baked_events`
+monta la escenografía igual en ambos mundos, y `record_baked_events` los hornea
+solo. Al extender el juego:
 
 - **Módulo nuevo** (JSON via --process-modules): solo agregarlo al pool de
-  `pick_module` con su peso. Spawn, BakeKeys y evento `module` son genéricos.
+  `pick_module` con su peso. Spawn, BakeKeys y evento `Module` son genéricos.
 - **Más sensores freeze/shrink/swap/bouncy**: cero cambios.
 - **TIPO de efecto nuevo por colisión**: 3 pasos —
-  1. registrar su sistema de contacto en el bloque `if !is_replay` (lee CollisionEvent);
-  2. hornear su evento al disparar (`BakeEvents`, ej. `"magnet <idx> <x> <y>"`);
-  3. brazo en `replay_effects::apply_replay_effects` que reproduzca su utilería
-     (visuales/despawns — el movimiento de cuerpos viene gratis en las poses).
+  1. variante nueva en `BakedEvent` (con su payload y su parse);
+  2. sistema de contacto en `react_to_real_collisions` que aplica SOLO la parte
+     física (RigidBody, grupos, teleports) y emite la variante;
+  3. brazo en `staging::stage_baked_events` con su utilería (visuales/despawns —
+     el movimiento de cuerpos viene gratis en las poses).
 - **Cuerpo RigidBody spawneado fuera de spawn_module/marbles**: asignarle una
   `BakeKey` determinista (sin ella cae al índice de Entity, que diverge si hay
   despawns).
 
-Si se olvida el paso 1 o las keys no cuadran, el replay hace panic con mensaje
-claro. Olvidar el paso 3 no rompe nada: se nota como utilería faltante en video.
+Nada falla en silencio: sin el brazo de escenografía el match del enum no
+compila; un payload ilegible o keys que no cuadran hacen panic con mensaje.
 
 ## Cómo extender modos
 

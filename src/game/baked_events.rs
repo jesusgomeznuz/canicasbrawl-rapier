@@ -7,7 +7,16 @@
 //!
 //! Este enum es la aduana de la pista de eventos: escribir (`payload`) y leer
 //! (`parse`) viven juntos — una sola fuente de verdad del formato del sobre.
+//!
+//! También circula como evento vivo de Bevy: los contactos reales lo emiten en
+//! física y `reemit_baked_events` lo re-emite en replay — la escenografía
+//! (staging.rs) lo consume igual en ambos mundos, y `record_baked_events` lo
+//! graba al bake sin que ningún sensor arme strings a mano.
 
+use bevy::prelude::*;
+use rapier_bevy::{BakeEvents, ReplayEvent};
+
+#[derive(Event, Clone)]
 pub enum BakedEvent {
     Freeze { marble: usize, x: f32, y: f32, duration: f32 },
     Shrink { marble: usize, x: f32, y: f32, duration: f32 },
@@ -75,5 +84,24 @@ impl BakedEvent {
             ["finish", top] => Some(BakedEvent::Finish { top: top.parse().ok()? }),
             _ => None,
         }
+    }
+}
+
+pub fn record_baked_events(
+    mut events: EventReader<BakedEvent>,
+    mut bake: Option<ResMut<BakeEvents>>,
+) {
+    let Some(bake) = bake.as_deref_mut() else { return };
+    for event in events.read() {
+        bake.0.push(event.payload());
+    }
+}
+
+pub fn reemit_baked_events(
+    mut wire: EventReader<ReplayEvent>,
+    mut events: EventWriter<BakedEvent>,
+) {
+    for ReplayEvent(payload) in wire.read() {
+        events.write(BakedEvent::parse(payload));
     }
 }

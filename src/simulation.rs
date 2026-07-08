@@ -62,6 +62,7 @@ fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorP
 }
 
 fn on_step(app: &mut App) {
+    app.add_event::<game::baked_events::BakedEvent>();
     app.add_systems(
         FixedUpdate,
         (
@@ -87,8 +88,8 @@ fn on_step(app: &mut App) {
     );
 
     match replay_path() {
-        Some(_) => register_replay_driven_systems(app),
-        None => register_physics_contact_systems(app),
+        Some(_) => reenact_the_baked_race(app),
+        None => react_to_real_collisions(app),
     }
 }
 
@@ -124,29 +125,41 @@ fn on_exit(app: &mut App) {
     app.add_systems(Last, production::voice_tracker::save_voice_tracker_on_exit);
 }
 
-fn register_physics_contact_systems(app: &mut App) {
+fn react_to_real_collisions(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (
-            game::world::level_generation::generate_level,
-            game::world::level_generation::disable_modules_above_screen,
-            game::sensors::freeze::on_freeze_contact,
-            game::sensors::shrink::on_shrink_contact,
-            game::sensors::swap::on_swap_contact,
-            game::sensors::bouncy::trigger_bouncy_pulse,
+            (
+                game::world::level_generation::generate_level,
+                game::world::level_generation::disable_modules_above_screen,
+                game::sensors::freeze::on_freeze_contact,
+                game::sensors::shrink::on_shrink_contact,
+                game::sensors::swap::on_swap_contact,
+                game::sensors::bouncy::trigger_bouncy_pulse,
+            ),
+            (
+                game::baked_events::record_baked_events,
+                game::staging::stage_baked_events,
+            ),
         )
+            .chain()
             .after(PhysicsSet::Writeback),
     );
 }
 
-fn register_replay_driven_systems(app: &mut App) {
+fn reenact_the_baked_race(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (
-            game::replay_effects::apply_replay_effects,
-            game::replay_effects::expire_replay_freezes,
+            game::baked_events::reemit_baked_events,
+            game::staging::stage_baked_events,
         )
+            .chain()
             .after(PhysicsSet::Writeback),
+    )
+    .add_systems(
+        FixedUpdate,
+        game::staging::expire_replay_freezes.after(PhysicsSet::Writeback),
     );
 }
 

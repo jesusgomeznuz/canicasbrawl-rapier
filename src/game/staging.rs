@@ -1,17 +1,23 @@
 use bevy::prelude::*;
-use rapier_bevy::{ReplayEvent, SimulationMode};
+use rapier_bevy::SimulationMode;
 
 use super::background::palette::ColorPalette;
 use super::baked_events::BakedEvent;
+use super::marbles::{Marble, MarbleIndex};
 use super::sensors::bouncy::{BounceCooldown, BouncePulse, BouncyOnContact};
 use super::sensors::freeze::{FreezeEffect, Frozen, spawn_frozen_visual};
 use super::sensors::shrink::{ShrinkEffect, Shrunk};
 use super::sensors::swap::{SwapEffect, spawn_swap_rings};
-use super::marbles::{Marble, MarbleIndex};
 use super::world::level_generation::{close_level_with_finish, spawn_level_module};
 
-pub fn apply_replay_effects(
-    mut events: EventReader<ReplayEvent>,
+/// La escenografía del juego — única para ambos mundos. Consume BakedEvents
+/// (emitidos por los contactos reales en física, o re-emitidos desde la
+/// partitura en replay) y monta todo lo visible que las poses no capturan:
+/// hielos, anillos, sensores consumidos, módulos, la meta, el pulso bouncy.
+/// El movimiento de los cuerpos nunca pasa por aquí — es de la física o de
+/// las poses, según el mundo.
+pub fn stage_baked_events(
+    mut events: EventReader<BakedEvent>,
     marbles: Query<(Entity, &MarbleIndex), With<Marble>>,
     freeze_sensors: Query<(Entity, &Transform), With<FreezeEffect>>,
     shrink_sensors: Query<(Entity, &Transform), With<ShrinkEffect>>,
@@ -26,53 +32,53 @@ pub fn apply_replay_effects(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut commands: Commands,
 ) {
-    for ReplayEvent(payload) in events.read() {
-        match BakedEvent::parse(payload) {
+    for event in events.read() {
+        match event {
             BakedEvent::Freeze { marble, x, y, duration } => {
-                let Some(marble) = marble_by_index(&marbles, marble) else { continue };
+                let Some(marble) = marble_by_index(&marbles, *marble) else { continue };
                 let visual = spawn_frozen_visual(&mut commands, &mut meshes, &mut materials, marble);
                 commands.entity(marble).insert(Frozen {
                     expires_at: time.elapsed_secs() + duration,
                     visual,
                 });
-                despawn_sensor_near(&mut commands, freeze_sensors.iter(), x, y);
+                despawn_sensor_near(&mut commands, freeze_sensors.iter(), *x, *y);
             }
             BakedEvent::Shrink { marble, x, y, duration } => {
-                let Some(marble) = marble_by_index(&marbles, marble) else { continue };
+                let Some(marble) = marble_by_index(&marbles, *marble) else { continue };
                 commands.entity(marble).insert(Shrunk {
                     expires_at: time.elapsed_secs() + duration,
                 });
-                despawn_sensor_near(&mut commands, shrink_sensors.iter(), x, y);
+                despawn_sensor_near(&mut commands, shrink_sensors.iter(), *x, *y);
             }
             BakedEvent::Swap { marble_a, marble_b, x, y } => {
                 let (Some(a), Some(b)) = (
-                    marble_by_index(&marbles, marble_a),
-                    marble_by_index(&marbles, marble_b),
+                    marble_by_index(&marbles, *marble_a),
+                    marble_by_index(&marbles, *marble_b),
                 ) else { continue };
                 spawn_swap_rings(&mut commands, &mut meshes, &mut materials, &time, a, b);
-                despawn_sensor_near(&mut commands, swap_sensors.iter(), x, y);
+                despawn_sensor_near(&mut commands, swap_sensors.iter(), *x, *y);
             }
             BakedEvent::Module { name, top, seed } => {
                 spawn_level_module(
-                    &name, top, seed, palette.obstacle_color(),
+                    name, *top, *seed, palette.obstacle_color(),
                     &mut commands, &mode, &asset_server, &mut meshes, &mut materials,
                 );
             }
             BakedEvent::Finish { top } => {
                 close_level_with_finish(
-                    top, palette.obstacle_color(),
+                    *top, palette.obstacle_color(),
                     &mut commands, &mode, &asset_server, &mut meshes, &mut materials,
                 );
             }
             BakedEvent::Bouncy { x, y, amplitude } => {
-                let target = Vec2::new(x, y);
+                let target = Vec2::new(*x, *y);
                 let hit = bouncys.iter()
                     .filter(|(entity, _)| !pulsing.contains(*entity))
                     .map(|(entity, transform)| (entity, transform.translation.truncate().distance_squared(target)))
                     .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
                 if let Some((sphere, distance_squared)) = hit {
                     if distance_squared < 0.25 * 0.25 {
-                        commands.entity(sphere).insert(BouncePulse { elapsed: 0.0, amplitude });
+                        commands.entity(sphere).insert(BouncePulse { elapsed: 0.0, amplitude: *amplitude });
                     }
                 }
             }
@@ -80,6 +86,8 @@ pub fn apply_replay_effects(
     }
 }
 
+/// try_unfreeze no opera en replay (consulta el contexto de Rapier, que ahí no
+/// existe); este reemplazo solo expira el visual del hielo.
 pub fn expire_replay_freezes(
     time: Res<Time>,
     frozen: Query<(Entity, &Frozen), With<Marble>>,

@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use bevy::sprite::ColorMaterial;
 use bevy_rapier3d::prelude::*;
-use rapier_bevy::BakeEvents;
 
 use super::badges::{EffectKind, EffectTimerBadge, spawn_badge};
 use crate::game::baked_events::BakedEvent;
@@ -31,41 +30,35 @@ pub struct Frozen {
 pub struct FreezeTimerMarker;
 
 pub fn on_freeze_contact(
-    mut events: EventReader<CollisionEvent>,
+    mut collisions: EventReader<CollisionEvent>,
     freezes: Query<&Transform, (With<FreezeEffect>, Without<Marble>)>,
     marbles: Query<(), (With<Marble>, Without<Frozen>)>,
     camera_q: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
     indices: Query<&MarbleIndex>,
-    mut bake_events: Option<ResMut<BakeEvents>>,
     time: Res<Time>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut events: EventWriter<BakedEvent>,
     mut commands: Commands,
 ) {
     let duration = 2.0_f32;
     let Ok((projection, camera_transform)) = camera_q.single() else { return };
-    for event in events.read() {
-        let CollisionEvent::Started(a, b, _) = event else { continue };
+    for collision in collisions.read() {
+        let CollisionEvent::Started(a, b, _) = collision else { continue };
         for (sensor, target) in [(*a, *b), (*b, *a)] {
             let Ok(sensor_transform) = freezes.get(sensor) else { continue };
             if !marbles.contains(target) { continue }
             if !world_pos_on_screen(sensor_transform.translation, projection, camera_transform) { continue }
+            let Ok(index) = indices.get(target) else { continue };
             info!("effect: freeze @({:.2},{:.2}) t={:.2}", sensor_transform.translation.x, sensor_transform.translation.y, time.elapsed_secs());
-            if let (Some(events), Ok(index)) = (bake_events.as_deref_mut(), indices.get(target)) {
-                events.0.push(BakedEvent::Freeze {
-                    marble: index.0,
-                    x: sensor_transform.translation.x,
-                    y: sensor_transform.translation.y,
-                    duration,
-                }.payload());
-            }
-            let visual = spawn_frozen_visual(&mut commands, &mut meshes, &mut materials, target);
             commands.entity(target).insert((
-                Frozen { expires_at: time.elapsed_secs() + duration, visual },
                 RigidBody::KinematicPositionBased,
                 frozen_groups(),
             ));
-            commands.entity(sensor).despawn();
+            events.write(BakedEvent::Freeze {
+                marble: index.0,
+                x: sensor_transform.translation.x,
+                y: sensor_transform.translation.y,
+                duration,
+            });
         }
     }
 }

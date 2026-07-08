@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::CollisionEvent;
-use rapier_bevy::BakeEvents;
 
 use crate::game::baked_events::BakedEvent;
 use crate::game::camera::world_pos_on_screen;
@@ -17,20 +16,18 @@ pub struct SwapRing {
 }
 
 pub fn on_swap_contact(
-    mut events: EventReader<CollisionEvent>,
+    mut collisions: EventReader<CollisionEvent>,
     swaps: Query<&Transform, (With<SwapEffect>, Without<Marble>)>,
     mut marbles: Query<(Entity, &mut Transform), (With<Marble>, Without<SwapEffect>)>,
     camera_q: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
     indices: Query<&MarbleIndex>,
-    mut bake_events: Option<ResMut<BakeEvents>>,
     time: Res<Time>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut events: EventWriter<BakedEvent>,
     mut commands: Commands,
 ) {
     let Ok((projection, camera_transform)) = camera_q.single() else { return };
-    for event in events.read() {
-        let CollisionEvent::Started(a, b, _) = event else { continue };
+    for collision in collisions.read() {
+        let CollisionEvent::Started(a, b, _) = collision else { continue };
         for (sensor, target) in [(*a, *b), (*b, *a)] {
             let Ok(sensor_transform) = swaps.get(sensor) else { continue };
             if !world_pos_on_screen(sensor_transform.translation, projection, camera_transform) { continue }
@@ -42,19 +39,16 @@ pub fn on_swap_contact(
                 commands.entity(sensor).despawn();
                 continue;
             };
+            let (Ok(index_a), Ok(index_b)) = (indices.get(target), indices.get(partner)) else { continue };
             info!("effect: swap @({:.2},{:.2}) t={:.2}", sensor_transform.translation.x, sensor_transform.translation.y, time.elapsed_secs());
-            if let (Some(events), Ok(index_a), Ok(index_b)) = (bake_events.as_deref_mut(), indices.get(target), indices.get(partner)) {
-                events.0.push(BakedEvent::Swap {
-                    marble_a: index_a.0,
-                    marble_b: index_b.0,
-                    x: sensor_transform.translation.x,
-                    y: sensor_transform.translation.y,
-                }.payload());
-            }
             if let Ok((_, mut transform)) = marbles.get_mut(target) { transform.translation = partner_position; }
             if let Ok((_, mut transform)) = marbles.get_mut(partner) { transform.translation = target_position; }
-            spawn_swap_rings(&mut commands, &mut meshes, &mut materials, &time, target, partner);
-            commands.entity(sensor).despawn();
+            events.write(BakedEvent::Swap {
+                marble_a: index_a.0,
+                marble_b: index_b.0,
+                x: sensor_transform.translation.x,
+                y: sensor_transform.translation.y,
+            });
         }
     }
 }

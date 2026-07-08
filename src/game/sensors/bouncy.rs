@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{CollisionEvent, Velocity};
-use rapier_bevy::BakeEvents;
 
 use crate::game::baked_events::BakedEvent;
 
@@ -19,19 +18,18 @@ pub struct BounceCooldown {
 }
 
 pub fn trigger_bouncy_pulse(
-    mut events: EventReader<CollisionEvent>,
+    mut collisions: EventReader<CollisionEvent>,
     bouncy: Query<&Transform, With<BouncyOnContact>>,
     already_pulsing: Query<(), Or<(With<BouncePulse>, With<BounceCooldown>)>>,
     movers: Query<(&Transform, &Velocity)>,
-    mut commands: Commands,
-    mut bake_events: Option<ResMut<BakeEvents>>,
+    mut events: EventWriter<BakedEvent>,
 ) {
     let base_amplitude = 0.04_f32;
     let speed_scale = 0.05_f32;
     let max_amplitude = 0.28_f32;
 
-    for event in events.read() {
-        if let CollisionEvent::Started(a, b, _) = event {
+    for collision in collisions.read() {
+        if let CollisionEvent::Started(a, b, _) = collision {
             for (sphere, other) in [(*a, *b), (*b, *a)] {
                 let Ok(sphere_transform) = bouncy.get(sphere) else { continue };
                 if already_pulsing.contains(sphere) { continue }
@@ -40,14 +38,11 @@ pub fn trigger_bouncy_pulse(
                     (-velocity.linvel.dot(direction)).max(0.0)
                 }).unwrap_or(0.0);
                 let amplitude = (base_amplitude + closing * speed_scale).min(max_amplitude);
-                if let Some(events) = bake_events.as_deref_mut() {
-                    events.0.push(BakedEvent::Bouncy {
-                        x: sphere_transform.translation.x,
-                        y: sphere_transform.translation.y,
-                        amplitude,
-                    }.payload());
-                }
-                commands.entity(sphere).insert(BouncePulse { elapsed: 0.0, amplitude });
+                events.write(BakedEvent::Bouncy {
+                    x: sphere_transform.translation.x,
+                    y: sphere_transform.translation.y,
+                    amplitude,
+                });
             }
         }
     }

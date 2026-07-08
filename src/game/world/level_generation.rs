@@ -5,8 +5,7 @@ use rand::RngCore;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rapier_bevy::{
-    BakeEvents, BakeKey, BodyType, ColliderShape, ObjectDef, SimulationMode, VisualDef,
-    spawn_object,
+    BakeKey, BodyType, ColliderShape, ObjectDef, SimulationMode, VisualDef, spawn_object,
 };
 
 use super::pickups::{
@@ -14,7 +13,6 @@ use super::pickups::{
     spawn_spinning_icon,
 };
 use super::structures::{spawn_floor, spawn_wall_segment, tinted_white};
-use crate::game::background::palette::ColorPalette;
 use crate::game::baked_events::BakedEvent;
 use crate::game::level::{ModuleData, WorldObject, load_module};
 use crate::game::marbles::Marble;
@@ -80,62 +78,43 @@ pub fn generate_level(
     sim_time: Res<Time<Fixed>>,
     marbles: Query<&Transform, With<Marble>>,
     mut level_gen: ResMut<LevelGen>,
-    mut commands: Commands,
-    mode: Res<SimulationMode>,
-    palette: Res<ColorPalette>,
-    asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut bake_events: Option<ResMut<BakeEvents>>,
+    mut events: EventWriter<BakedEvent>,
 ) {
     let Some(leader_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else {
         return;
     };
-    let obstacle_color = palette.obstacle_color();
     match decide_level_action(&level_gen, leader_y, sim_time.elapsed_secs()) {
         LevelGenerationAction::GenerateModule => {
             let name = pick_module(&mut level_gen);
             let top = level_gen.next_top;
             let module_seed = level_gen.rng.next_u64();
-            let bottom = spawn_level_module(
-                name,
+            events.write(BakedEvent::Module {
+                name: name.to_string(),
                 top,
-                module_seed,
-                obstacle_color,
-                &mut commands,
-                &mode,
-                &asset_server,
-                &mut meshes,
-                &mut materials,
-            );
-            if let Some(events) = bake_events.as_deref_mut() {
-                events.0.push(BakedEvent::Module {
-                    name: name.to_string(),
-                    top,
-                    seed: module_seed,
-                }.payload());
-            }
-            level_gen.next_top = bottom;
+                seed: module_seed,
+            });
+            level_gen.next_top = top - module_height(name);
             level_gen.last_module = Some(name);
             level_gen.modules_spawned += 1;
         }
         LevelGenerationAction::SpawnFinishLine => {
-            close_level_with_finish(
-                level_gen.next_top,
-                obstacle_color,
-                &mut commands,
-                &mode,
-                &asset_server,
-                &mut meshes,
-                &mut materials,
-            );
-            if let Some(events) = bake_events.as_deref_mut() {
-                events.0.push(BakedEvent::Finish { top: level_gen.next_top }.payload());
-            }
+            events.write(BakedEvent::Finish { top: level_gen.next_top });
             level_gen.finish_spawned = true;
         }
         LevelGenerationAction::DoNothing => {}
     }
+}
+
+fn module_height(name: &str) -> f32 {
+    let module_gap = 0.1;
+    let ModuleData { objects } = load_module(name);
+    let (y_min, y_max) = objects
+        .iter()
+        .map(|o| o.y_bounds())
+        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), (mn, mx)| {
+            (lo.min(mn), hi.max(mx))
+        });
+    (y_max - y_min) + module_gap
 }
 
 pub fn spawn_level_module(
