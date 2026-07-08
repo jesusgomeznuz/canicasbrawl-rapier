@@ -26,7 +26,7 @@ pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPale
     on_start(&mut app, seed, roster, palette);
     on_step(&mut app);
     on_frame_update(&mut app);
-    on_final_positions(&mut app);
+    after_frame_update(&mut app);
     on_exit(&mut app);
 
     app.run();
@@ -67,11 +67,19 @@ fn on_step(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (
-            game::finish::check_finish_crossing,
-            game::leader::update_race_leader,
-            production::voice_tracker::track_race_leader,
+            (
+                game::finish::check_finish_crossing,
+                game::leader::update_race_leader,
+                production::voice_tracker::track_race_leader,
+            )
+                .chain(),
+            (
+                game::baked_events::reemit_baked_events,
+                game::baked_events::record_baked_events,
+                game::staging::stage_baked_events,
+            )
+                .chain(),
         )
-            .chain()
             .after(PhysicsSet::Writeback),
     )
     .add_systems(
@@ -85,19 +93,6 @@ fn on_step(app: &mut App) {
             game::sensors::bouncy::tick_bounce_cooldown,
             game::camera::camera_follows_lowest_marble,
         )
-            .after(PhysicsSet::Writeback),
-    );
-
-    // La banda de eventos es igual en todos los mundos: re-emitir la partitura
-    // (buzón vacío si no hay), hornear (sin BakeEvents no hay dónde), escenificar.
-    app.add_systems(
-        FixedUpdate,
-        (
-            game::baked_events::reemit_baked_events,
-            game::baked_events::record_baked_events,
-            game::staging::stage_baked_events,
-        )
-            .chain()
             .after(PhysicsSet::Writeback),
     );
 
@@ -116,19 +111,19 @@ fn on_frame_update(app: &mut App) {
             game::background::clouds::update_clouds,
             game::sensors::freeze::manage_freeze_badges,
             game::sensors::shrink::manage_shrink_badges,
-            game::sensors::badges::update_badges,
         ),
     )
     .add_systems(Update, game::hud::update_hud)
     .add_systems(Update, production::stall_detector::detect_stall);
 }
 
-fn on_final_positions(app: &mut App) {
+fn after_frame_update(app: &mut App) {
     app.add_systems(
         PostUpdate,
         (
             game::marbles::update_marble_labels,
             game::leader::crown_follows_leader,
+            game::sensors::badges::update_badges,
         )
             .after(TransformSystem::TransformPropagate),
     );
