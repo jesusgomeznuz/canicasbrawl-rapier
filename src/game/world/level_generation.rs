@@ -4,18 +4,12 @@ use rand::Rng;
 use rand::RngCore;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
-use rapier_bevy::{
-    BodyType, ColliderShape, ObjectDef, SimulationMode, TimelineKey, VisualDef, spawn_object,
-};
+use rapier_bevy::SimulationMode;
 
-use super::pickups::{
-    attach_effect_marker, resolve_slot_variant, should_skip_effect, spawn_invisible_sensor,
-    spawn_spinning_icon,
-};
-use super::structures::{spawn_floor, spawn_wall_segment, tinted_white};
-use crate::game::race_events::RaceEvent;
-use super::modules::{ModuleData, WorldObject, load_module};
+use super::modules::{ModuleSpan, module_height, spawn_module};
+use super::structures::{spawn_floor, spawn_wall_segment};
 use crate::game::marbles::Marble;
+use crate::game::race_events::RaceEvent;
 
 #[derive(Resource)]
 pub struct LevelSeed(pub u64);
@@ -46,11 +40,6 @@ impl LevelGen {
     }
 }
 
-#[derive(Component, Clone, Copy)]
-pub struct ModuleSpan {
-    pub bottom: f32,
-}
-
 pub fn generate_level(
     sim_time: Res<Time<Fixed>>,
     marbles: Query<&Transform, With<Marble>>,
@@ -75,7 +64,9 @@ pub fn generate_level(
             level_gen.modules_spawned += 1;
         }
         LevelGenerationAction::SpawnFinishLine => {
-            events.write(RaceEvent::Finish { top: level_gen.next_top });
+            events.write(RaceEvent::Finish {
+                top: level_gen.next_top,
+            });
             level_gen.finish_spawned = true;
         }
         LevelGenerationAction::DoNothing => {}
@@ -163,7 +154,12 @@ pub fn disable_modules_above_screen(
     };
     let exit_margin = 0.5;
     for (entity, span) in &modules {
-        if crate::game::camera::world_y_above_screen(span.bottom, exit_margin, projection, camera_transform) {
+        if crate::game::camera::world_y_above_screen(
+            span.bottom,
+            exit_margin,
+            projection,
+            camera_transform,
+        ) {
             commands.entity(entity).insert(ColliderDisabled);
         }
     }
@@ -224,251 +220,4 @@ fn pick_module(level_gen: &mut LevelGen) -> &'static str {
             return pick;
         }
     }
-}
-
-fn module_height(name: &str) -> f32 {
-    let module_gap = 0.1;
-    let ModuleData { objects } = load_module(name);
-    let (y_min, y_max) = objects
-        .iter()
-        .map(|o| o.y_bounds())
-        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), (mn, mx)| {
-            (lo.min(mn), hi.max(mx))
-        });
-    (y_max - y_min) + module_gap
-}
-
-fn module_acts_as_gate(name: &str) -> bool {
-    matches!(name, "toruses" | "bouncy_walls" | "bars")
-}
-
-fn spawn_module(
-    name: &str,
-    level_top: f32,
-    obstacle_color: Color,
-    module_seed: u64,
-    commands: &mut Commands,
-    mode: &SimulationMode,
-    asset_server: &AssetServer,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
-) -> f32 {
-    let rng = &mut SmallRng::seed_from_u64(module_seed);
-    let body_key = |obj_idx: usize| TimelineKey(module_seed ^ ((obj_idx as u64 + 1) << 32));
-    let ModuleData { objects, .. } = load_module(name);
-    let (y_min, y_max) = objects
-        .iter()
-        .map(|o| o.y_bounds())
-        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), (mn, mx)| {
-            (lo.min(mn), hi.max(mx))
-        });
-    let trimmed_height = y_max - y_min;
-    let y_offset = level_top - y_max;
-    let gate_span = module_acts_as_gate(name).then_some(ModuleSpan {
-        bottom: level_top - trimmed_height,
-    });
-    let tag_if_gate = |commands: &mut Commands, entity: Entity| {
-        if let Some(span) = gate_span {
-            commands.entity(entity).insert(span);
-        }
-    };
-    for (obj_idx, obj) in objects.iter().enumerate() {
-        match obj {
-            WorldObject::Box {
-                x,
-                y,
-                hx,
-                hy,
-                rot,
-                angvel,
-                border_radius,
-                friction,
-                restitution,
-                bouncy,
-            } => {
-                let entity = spawn_object(
-                    commands,
-                    ObjectDef {
-                        shape: ColliderShape::Box {
-                            hx: *hx,
-                            hy: *hy,
-                            hz: crate::UNIT / 4.0,
-                        },
-                        position: Vec3::new(*x, *y + y_offset, 0.0),
-                        rotation: Quat::from_rotation_z(*rot),
-                        body: if angvel != &[0.0; 3] {
-                            BodyType::Kinematic
-                        } else {
-                            BodyType::Static
-                        },
-                        angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
-                        visual: Some(VisualDef {
-                            border_radius: *border_radius,
-                            ..tinted_white(obstacle_color)
-                        }),
-                        restitution: Some(restitution.unwrap_or(0.05)),
-                        friction: Some(friction.unwrap_or(0.15)),
-                        ..Default::default()
-                    },
-                    mode,
-                    asset_server,
-                    meshes,
-                    materials,
-                );
-                commands.entity(entity).insert(body_key(obj_idx));
-                tag_if_gate(commands, entity);
-                if *bouncy {
-                    commands.entity(entity).insert((
-                        ActiveEvents::COLLISION_EVENTS,
-                        crate::game::sensors::bouncy::BouncyOnContact,
-                    ));
-                }
-            }
-            WorldObject::Sphere {
-                x,
-                y,
-                radius,
-                friction,
-                restitution,
-                bouncy,
-            } => {
-                let entity = spawn_object(
-                    commands,
-                    ObjectDef {
-                        shape: ColliderShape::Sphere { radius: *radius },
-                        position: Vec3::new(*x, *y + y_offset, 0.0),
-                        body: BodyType::Static,
-                        visual: Some(tinted_white(obstacle_color)),
-                        restitution: Some(restitution.unwrap_or(0.05)),
-                        friction: Some(friction.unwrap_or(0.15)),
-                        ..Default::default()
-                    },
-                    mode,
-                    asset_server,
-                    meshes,
-                    materials,
-                );
-                commands.entity(entity).insert(body_key(obj_idx));
-                tag_if_gate(commands, entity);
-                if *bouncy {
-                    commands.entity(entity).insert((
-                        ActiveEvents::COLLISION_EVENTS,
-                        crate::game::sensors::bouncy::BouncyOnContact,
-                    ));
-                }
-            }
-            WorldObject::Mesh {
-                x,
-                y,
-                rot,
-                model_name,
-                angvel,
-                friction,
-                restitution,
-            } => {
-                let entity = spawn_object(
-                    commands,
-                    ObjectDef {
-                        shape: ColliderShape::MeshObject {
-                            model_name: model_name.clone(),
-                        },
-                        position: Vec3::new(*x, *y + y_offset, 0.0),
-                        rotation: Quat::from_rotation_z(*rot),
-                        body: if angvel != &[0.0; 3] {
-                            BodyType::Kinematic
-                        } else {
-                            BodyType::Static
-                        },
-                        angvel: (angvel != &[0.0; 3]).then(|| Vec3::from(*angvel)),
-                        visual: Some(tinted_white(obstacle_color)),
-                        restitution: Some(restitution.unwrap_or(0.05)),
-                        friction: Some(friction.unwrap_or(0.15)),
-                        ..Default::default()
-                    },
-                    mode,
-                    asset_server,
-                    meshes,
-                    materials,
-                );
-                commands.entity(entity).insert(body_key(obj_idx));
-                tag_if_gate(commands, entity);
-            }
-            WorldObject::Image {
-                x,
-                y,
-                w,
-                h,
-                rot,
-                texture,
-            } => {
-                let half_depth = crate::UNIT / 4.0;
-                commands.spawn((
-                    Mesh3d(meshes.add(Rectangle::new(*w, *h))),
-                    MeshMaterial3d(materials.add(StandardMaterial {
-                        base_color_texture: Some(asset_server.load(texture.clone())),
-                        alpha_mode: AlphaMode::Blend,
-                        unlit: true,
-                        ..default()
-                    })),
-                    Transform::from_translation(Vec3::new(*x, *y + y_offset, half_depth + 0.001))
-                        .with_rotation(Quat::from_rotation_z(*rot)),
-                ));
-            }
-            WorldObject::Effect {
-                x,
-                y,
-                w,
-                h,
-                rot,
-                variant,
-            } => {
-                let position = Vec3::new(*x, *y + y_offset, 0.0);
-                if should_skip_effect(variant, position.y) {
-                    continue;
-                }
-                let sensor = spawn_invisible_sensor(
-                    commands,
-                    position,
-                    *w,
-                    *h,
-                    *rot,
-                    mode,
-                    asset_server,
-                    meshes,
-                    materials,
-                );
-                tag_if_gate(commands, sensor);
-                attach_effect_marker(commands, sensor, variant);
-                spawn_spinning_icon(commands, asset_server, sensor, variant);
-            }
-            WorldObject::EffectSlot {
-                x,
-                y,
-                w,
-                h,
-                rot,
-                options,
-            } => {
-                let position = Vec3::new(*x, *y + y_offset, 0.0);
-                let Some(variant) = resolve_slot_variant(options, position.y, rng) else {
-                    continue;
-                };
-                let sensor = spawn_invisible_sensor(
-                    commands,
-                    position,
-                    *w,
-                    *h,
-                    *rot,
-                    mode,
-                    asset_server,
-                    meshes,
-                    materials,
-                );
-                tag_if_gate(commands, sensor);
-                attach_effect_marker(commands, sensor, variant);
-                spawn_spinning_icon(commands, asset_server, sensor, variant);
-            }
-        }
-    }
-    level_top - trimmed_height
 }

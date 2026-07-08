@@ -77,7 +77,11 @@ src/
     camera.rs          cámara, luces y checks de encuadre
     finish.rs          meta y orden de llegada
     leader.rs          quién va ganando + su corona
-    world/             setup, level_generation, modules (aduana del JSON), pickups, structures
+    world/
+      level_generation.rs  el director: decide cuándo, cuál y dónde (LevelGen, pick_module)
+      modules.rs           el constructor: qué ES un módulo — aduana del JSON + spawn_module
+      pickups.rs           qué efecto cae en cada slot
+      setup.rs / structures.rs  arranque del escenario; suelo y paredes
     sensors/           freeze, shrink, swap, bouncy + badges e icons compartidos
     background/        palette, sky, stars, clouds
   production/
