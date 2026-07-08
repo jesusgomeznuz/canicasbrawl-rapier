@@ -3,6 +3,8 @@ use rapier_bevy::{
     AssetsLoading, BodyType, ColliderShape, LockedAxes, ObjectDef, SimulationMode, TimelineKey, spawn_object,
 };
 
+use super::faces::{attach_marble_face, dominant_color_from_png};
+use super::labels::spawn_marble_label;
 use super::roster::MarbleConfig;
 
 #[derive(Component)]
@@ -13,15 +15,6 @@ pub struct MarbleName(pub String);
 
 #[derive(Component)]
 pub struct MarbleIndex(pub usize);
-
-#[derive(Component)]
-pub struct MarbleLabel(pub Entity);
-
-#[derive(Component)]
-pub struct MarbleLabelOutline {
-    pub marble: Entity,
-    pub offset: Vec2,
-}
 
 pub fn spawn_marbles(
     commands: &mut Commands,
@@ -62,38 +55,6 @@ pub fn spawn_marbles(
                 materials,
                 assets_loading,
             );
-        }
-    }
-}
-
-pub fn update_marble_labels(
-    marbles: Query<&GlobalTransform, With<Marble>>,
-    mut labels: Query<(&mut Transform, &mut TextFont, &MarbleLabel), Without<MarbleLabelOutline>>,
-    mut outlines: Query<(&mut Transform, &mut TextFont, &MarbleLabelOutline), Without<MarbleLabel>>,
-    camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-) {
-    let Ok((camera, camera_global_transform)) = camera_q.single() else { return };
-    let Some(viewport) = camera.logical_viewport_size() else { return };
-    // 2.2% del alto del viewport → tamaño relativo igual en ventana y en --record
-    let font_size = viewport.y * 0.022;
-    for (mut transform, mut font, MarbleLabel(marble_entity)) in &mut labels {
-        font.font_size = font_size;
-        let Ok(marble_global_transform) = marbles.get(*marble_entity) else { continue };
-        let above = marble_global_transform.translation() + Vec3::Y * 0.13;
-        if let Ok(screen_pos) = camera.world_to_viewport(camera_global_transform, above) {
-            transform.translation.x = screen_pos.x - viewport.x / 2.0;
-            transform.translation.y = viewport.y / 2.0 - screen_pos.y;
-            transform.translation.z = 0.0;
-        }
-    }
-    for (mut transform, mut font, outline) in &mut outlines {
-        font.font_size = font_size;
-        let Ok(marble_global_transform) = marbles.get(outline.marble) else { continue };
-        let above = marble_global_transform.translation() + Vec3::Y * 0.13;
-        if let Ok(screen_pos) = camera.world_to_viewport(camera_global_transform, above) {
-            transform.translation.x = screen_pos.x - viewport.x / 2.0 + outline.offset.x;
-            transform.translation.y = viewport.y / 2.0 - screen_pos.y + outline.offset.y;
-            transform.translation.z = -1.0; // detrás del texto blanco
         }
     }
 }
@@ -226,113 +187,4 @@ fn build_marble_mesh(half_depth: f32, radius: f32, border: f32) -> Mesh {
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
         .with_inserted_indices(Indices::U32(indices))
-}
-
-fn spawn_marble_label(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    marble_entity: Entity,
-    nickname: &str,
-) {
-    let font = asset_server.load("fonts/DMSans-Medium.ttf");
-    for &(offset_x, offset_y) in &[(-1.5f32, 0.0f32), (1.5, 0.0), (0.0, -1.5), (0.0, 1.5)] {
-        commands.spawn((
-            Text2d::new(nickname),
-            TextFont {
-                font: font.clone(),
-                font_size: 20.0,
-                ..default()
-            },
-            TextColor(Color::srgba(0.0, 0.0, 0.0, 0.88)),
-            TextLayout::new_with_justify(JustifyText::Center),
-            MarbleLabelOutline {
-                marble: marble_entity,
-                offset: Vec2::new(offset_x, offset_y),
-            },
-        ));
-    }
-    commands.spawn((
-        Text2d::new(nickname),
-        TextFont {
-            font,
-            font_size: 20.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        TextLayout::new_with_justify(JustifyText::Center),
-        MarbleLabel(marble_entity),
-    ));
-}
-
-fn attach_marble_face(
-    commands: &mut Commands,
-    entity: Entity,
-    image_path: &str,
-    background_color: Color,
-    asset_server: &AssetServer,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
-    assets_loading: &mut Option<ResMut<AssetsLoading>>,
-) {
-    let radius = 0.085;
-    let half_depth = crate::UNIT / 4.0;
-    let quad_size = radius * 2.0;
-    let quad_z = half_depth;
-    let image_handle: Handle<Image> = asset_server.load(image_path.to_string());
-
-    if let Some(loading) = assets_loading.as_deref_mut() {
-        loading.0.push(image_handle.clone().untyped());
-    }
-
-    commands.entity(entity).with_children(|parent| {
-        parent.spawn((
-            Mesh3d(meshes.add(Circle::new(radius))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: background_color,
-                unlit: true,
-                ..default()
-            })),
-            Transform::from_xyz(0.0, 0.0, quad_z + 0.001),
-        ));
-        parent.spawn((
-            Mesh3d(meshes.add(Rectangle::new(quad_size, quad_size))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color_texture: Some(image_handle),
-                alpha_mode: AlphaMode::Blend,
-                unlit: true,
-                ..default()
-            })),
-            Transform::from_xyz(0.0, 0.0, quad_z + 0.002),
-        ));
-    });
-}
-
-fn dominant_color_from_png(image_path: &str) -> Option<Color> {
-    use image::GenericImageView;
-    use std::collections::HashMap;
-
-    let full_path = format!("assets/{}", image_path);
-    let img = image::open(&full_path).ok()?;
-
-    let mut counts: HashMap<(u8, u8, u8), u32> = HashMap::new();
-
-    for (_, _, pixel) in img.pixels() {
-        let [r, g, b, a] = pixel.0;
-        let is_transparent = a < 128;
-        let is_background_white = r > 200 && g > 200 && b > 200;
-        let is_outline_black = r < 40 && g < 40 && b < 40;
-        if is_transparent || is_background_white || is_outline_black {
-            continue;
-        }
-        let quantized_to_32_cube = (r & 0xE0, g & 0xE0, b & 0xE0);
-        *counts.entry(quantized_to_32_cube).or_insert(0) += 1;
-    }
-
-    let (r, g, b) = counts.into_iter().max_by_key(|(_, c)| *c)?.0;
-    let cube_center = 16;
-    Some(Color::srgb_u8(
-        r.saturating_add(cube_center),
-        g.saturating_add(cube_center),
-        b.saturating_add(cube_center),
-    ))
 }

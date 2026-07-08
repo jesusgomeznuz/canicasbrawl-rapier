@@ -75,7 +75,9 @@ src/
   game/
     race_events.rs     ADUANA de eventos: enum RaceEvent, payload+parse juntos
     staging.rs         escenografía única de ambos mundos (consume RaceEvent)
-    marbles.rs         la canica: cuerpo, mesh, cara, etiquetas
+    marbles.rs         la canica: componentes, ensamblador, cuerpo, mesh
+    labels.rs          etiquetas de nombre: spawn + seguimiento en pantalla
+    faces.rs           la cara: disco + PNG del personaje + color dominante
     roster.rs          casting: quién corre (build_roster / slots_roster)
     camera.rs          cámara, luces y checks de encuadre
     finish.rs          meta y orden de llegada

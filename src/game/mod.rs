@@ -1,7 +1,9 @@
 pub mod background;
 pub mod race_events;
 pub mod camera;
+pub mod faces;
 pub mod finish;
+pub mod labels;
 pub mod leader;
 pub mod marbles;
 pub mod staging;

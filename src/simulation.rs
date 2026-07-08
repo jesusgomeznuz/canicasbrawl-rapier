@@ -119,7 +119,7 @@ fn after_frame_update(app: &mut App) {
     app.add_systems(
         PostUpdate,
         (
-            game::marbles::update_marble_labels,
+            game::labels::update_marble_labels,
             game::leader::crown_follows_leader,
             game::sensors::badges::update_badges,
         )
