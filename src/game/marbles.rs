@@ -3,15 +3,14 @@ use rapier_bevy::{
     AssetsLoading, BakeKey, BodyType, ColliderShape, LockedAxes, ObjectDef, SimulationMode, spawn_object,
 };
 
+use super::roster::MarbleConfig;
+
 #[derive(Component)]
 pub struct Marble;
 
 #[derive(Component)]
 pub struct MarbleName(pub String);
 
-/// Posición de la canica en el roster (= índice de slot en el flujo de casting).
-/// Identidad estable entre bake y replay: los nombres cambian con el cast, el
-/// índice no. Los eventos horneados refieren canicas por este índice.
 #[derive(Component)]
 pub struct MarbleIndex(pub usize);
 
@@ -22,61 +21,6 @@ pub struct MarbleLabel(pub Entity);
 pub struct MarbleLabelOutline {
     pub marble: Entity,
     pub offset: Vec2,
-}
-
-pub struct MarbleConfig {
-    pub nickname: String,
-    /// `None` = canica anónima (modo `--slots`): sin cara ni color de personaje.
-    /// La física no depende de la identidad, así que el reparto se decide después.
-    pub image: Option<String>,
-}
-
-/// Qué personajes corren esta carrera. Lo arma `build_roster` desde el CLI
-/// (`--characters`) y lo lee `world::setup` al spawnar las canicas.
-#[derive(Resource)]
-pub struct Roster(pub Vec<MarbleConfig>);
-
-/// Construye el roster a partir de los nombres pedidos por CLI (CamelCase canónico,
-/// mismos strings que se emiten como `leader` en voice_tracker.json). Sin nombres,
-/// devuelve el roster por defecto. Falla nombrando al personaje si le falta imagen.
-pub fn build_roster(characters: Option<Vec<String>>) -> Result<Vec<MarbleConfig>, String> {
-    let Some(names) = characters else {
-        return Ok(default_roster());
-    };
-    if names.len() > 9 {
-        return Err(format!(
-            "Pediste {} personajes pero el grid de salida es 3×3 (máximo 9).",
-            names.len(),
-        ));
-    }
-    names.iter().map(|name| character_config(name)).collect()
-}
-
-/// Roster anónimo para el casting: N canicas `slot_0..slot_{N-1}` sin identidad.
-/// El bake corre la física con slots y el voice_tracker reporta qué slot lidera;
-/// al renderizar la timeline elegida, `--characters` viste los slots por posición
-/// (el nombre i-ésimo es slot_i). Mismo N y mismo orden de spawn en ambas fases.
-pub fn slots_roster(n: usize) -> Result<Vec<MarbleConfig>, String> {
-    if n == 0 || n > 9 {
-        return Err(format!("--slots {n}: el grid de salida es 3×3 (entre 1 y 9)."));
-    }
-    Ok((0..n)
-        .map(|i| MarbleConfig { nickname: format!("slot_{i}"), image: None })
-        .collect())
-}
-
-fn character_config(name: &str) -> Result<MarbleConfig, String> {
-    let image = format!("characters/{}.png", name.to_lowercase());
-    if !std::path::Path::new("assets").join(&image).exists() {
-        return Err(format!(
-            "Personaje '{name}' sin imagen: falta assets/{image}. \
-             Revisa el nombre (CamelCase canónico) o agrega el asset.",
-        ));
-    }
-    Ok(MarbleConfig {
-        nickname: name.to_string(),
-        image: Some(image),
-    })
 }
 
 pub fn spawn_marbles(
@@ -91,8 +35,8 @@ pub fn spawn_marbles(
     assets_loading: &mut Option<ResMut<AssetsLoading>>,
 ) {
     let grid = spawn_grid(spawn_cx, spawn_cy);
-    for (i, (cfg, pos)) in roster.iter().zip(grid.iter()).enumerate() {
-        let color = cfg.image.as_deref()
+    for (i, (config, position)) in roster.iter().zip(grid.iter()).enumerate() {
+        let color = config.image.as_deref()
             .and_then(dominant_color_from_png)
             .unwrap_or(Color::WHITE);
         let entity = spawn_marble_body(
@@ -101,13 +45,13 @@ pub fn spawn_marbles(
             asset_server,
             meshes,
             materials,
-            cfg,
-            *pos,
+            config,
+            *position,
             color,
         );
         commands.entity(entity).insert((MarbleIndex(i), BakeKey(i as u64)));
-        spawn_marble_label(commands, asset_server, entity, &cfg.nickname);
-        if let Some(image) = &cfg.image {
+        spawn_marble_label(commands, asset_server, entity, &config.nickname);
+        if let Some(image) = &config.image {
             attach_marble_face(
                 commands,
                 entity,
@@ -120,23 +64,6 @@ pub fn spawn_marbles(
             );
         }
     }
-}
-
-fn default_roster() -> Vec<MarbleConfig> {
-    [
-        "Marceline",
-        "Perla",
-        "Steven",
-        "Wendy",
-        "Naruto",
-        "Ben10",
-        "Patricio",
-        "Finn",
-        "Bart",
-    ]
-    .iter()
-    .map(|name| character_config(name).expect("default roster asset missing"))
-    .collect()
 }
 
 fn spawn_grid(cx: f32, cy: f32) -> [(f32, f32); 9] {
@@ -161,7 +88,7 @@ fn spawn_marble_body(
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
-    cfg: &MarbleConfig,
+    config: &MarbleConfig,
     (x, y): (f32, f32),
     body_color: Color,
 ) -> Entity {
@@ -189,7 +116,7 @@ fn spawn_marble_body(
                     | LockedAxes::ROTATION_LOCKED_Y,
             ),
             visual: None,
-            collision_groups: Some(super::effects::marble_groups()),
+            collision_groups: Some(super::sensors::freeze::marble_groups()),
             ..Default::default()
         },
         mode,
@@ -208,7 +135,7 @@ fn spawn_marble_body(
         Mesh3d(body_mesh),
         MeshMaterial3d(body_material),
         Marble,
-        MarbleName(cfg.nickname.clone()),
+        MarbleName(config.nickname.clone()),
     ));
     entity
 }
@@ -222,7 +149,6 @@ fn build_marble_mesh(half_depth: f32, radius: f32, border: f32) -> Mesh {
     let z_back_inner = -half_depth + border;
     let r_inner = (radius - border).max(0.0);
 
-    // (pr, pz, nr, nz) por ring. Misma posición con distinta normal crea un seam (filo nítido).
     let mut rings: Vec<(f32, f32, f32, f32)> = Vec::new();
     rings.push((0.0, half_depth, 0.0, 1.0));
     rings.push((radius, half_depth, 0.0, 1.0));
@@ -264,14 +190,10 @@ fn build_marble_mesh(half_depth: f32, radius: f32, border: f32) -> Mesh {
         }
     }
 
-    let mut mesh = Mesh::new(
-        PrimitiveTopology::TriangleList,
-        RenderAssetUsages::default(),
-    );
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_indices(Indices::U32(indices));
-    mesh
+    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_indices(Indices::U32(indices))
 }
 
 fn spawn_marble_label(
@@ -280,11 +202,8 @@ fn spawn_marble_label(
     marble_entity: Entity,
     nickname: &str,
 ) {
-    // La fuente default de Bevy es un subset ASCII: nombres con acentos ("pacífica")
-    // renderizaban tofu (□). DM Sans cubre Latín extendido.
     let font = asset_server.load("fonts/DMSans-Medium.ttf");
-    // 4 copias oscuras desplazadas = outline fake (N/S/E/O a 1.5 px, z=-1 para quedar detrás)
-    for &(ox, oy) in &[(-1.5f32, 0.0f32), (1.5, 0.0), (0.0, -1.5), (0.0, 1.5)] {
+    for &(offset_x, offset_y) in &[(-1.5f32, 0.0f32), (1.5, 0.0), (0.0, -1.5), (0.0, 1.5)] {
         commands.spawn((
             Text2d::new(nickname),
             TextFont {
@@ -296,11 +215,10 @@ fn spawn_marble_label(
             TextLayout::new_with_justify(JustifyText::Center),
             MarbleLabelOutline {
                 marble: marble_entity,
-                offset: Vec2::new(ox, oy),
+                offset: Vec2::new(offset_x, offset_y),
             },
         ));
     }
-    // Texto principal blanco encima
     commands.spawn((
         Text2d::new(nickname),
         TextFont {
@@ -318,7 +236,7 @@ fn attach_marble_face(
     commands: &mut Commands,
     entity: Entity,
     image_path: &str,
-    bg_color: Color,
+    background_color: Color,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -328,18 +246,17 @@ fn attach_marble_face(
     let half_depth = crate::UNIT / 4.0;
     let quad_size = radius * 2.0;
     let quad_z = half_depth;
-    let img_handle: Handle<Image> = asset_server.load(image_path.to_string());
+    let image_handle: Handle<Image> = asset_server.load(image_path.to_string());
 
-    if let Some(al) = assets_loading.as_deref_mut() {
-        al.0.push(img_handle.clone().untyped());
+    if let Some(loading) = assets_loading.as_deref_mut() {
+        loading.0.push(image_handle.clone().untyped());
     }
 
     commands.entity(entity).with_children(|parent| {
-        // Disco sólido sin textura → sin píxeles antialiased que causan franja de color
         parent.spawn((
             Mesh3d(meshes.add(Circle::new(radius))),
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: bg_color,
+                base_color: background_color,
                 unlit: true,
                 ..default()
             })),
@@ -348,7 +265,7 @@ fn attach_marble_face(
         parent.spawn((
             Mesh3d(meshes.add(Rectangle::new(quad_size, quad_size))),
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color_texture: Some(img_handle),
+                base_color_texture: Some(image_handle),
                 alpha_mode: AlphaMode::Blend,
                 unlit: true,
                 ..default()
@@ -358,11 +275,6 @@ fn attach_marble_face(
     });
 }
 
-/// Lee el PNG desde `assets/<path>` y devuelve el color más frecuente ignorando:
-/// - píxeles transparentes (alpha < 128)
-/// - píxeles demasiado claros (todos los canales > 200) para no capturar fondos blancos
-/// - píxeles demasiado oscuros (todos < 40) para evitar contornos negros
-/// Los colores se cuantifican en cubos de 32 unidades por canal para agrupar tonos similares.
 fn dominant_color_from_png(image_path: &str) -> Option<Color> {
     use image::GenericImageView;
     use std::collections::HashMap;
@@ -374,25 +286,53 @@ fn dominant_color_from_png(image_path: &str) -> Option<Color> {
 
     for (_, _, pixel) in img.pixels() {
         let [r, g, b, a] = pixel.0;
-        if a < 128 {
+        let is_transparent = a < 128;
+        let is_background_white = r > 200 && g > 200 && b > 200;
+        let is_outline_black = r < 40 && g < 40 && b < 40;
+        if is_transparent || is_background_white || is_outline_black {
             continue;
         }
-        if r > 200 && g > 200 && b > 200 {
-            continue;
-        } // blanco / muy claro
-        if r < 40 && g < 40 && b < 40 {
-            continue;
-        } // negro / muy oscuro
-        // Cuantizar a cubos de 32 para agrupar tonos similares
-        let key = (r & 0xE0, g & 0xE0, b & 0xE0);
-        *counts.entry(key).or_insert(0) += 1;
+        let quantized_to_32_cube = (r & 0xE0, g & 0xE0, b & 0xE0);
+        *counts.entry(quantized_to_32_cube).or_insert(0) += 1;
     }
 
     let (r, g, b) = counts.into_iter().max_by_key(|(_, c)| *c)?.0;
-    // Usar el centro del cubo (+16) para un color más representativo
+    let cube_center = 16;
     Some(Color::srgb_u8(
-        r.saturating_add(16),
-        g.saturating_add(16),
-        b.saturating_add(16),
+        r.saturating_add(cube_center),
+        g.saturating_add(cube_center),
+        b.saturating_add(cube_center),
     ))
+}
+
+pub fn update_marble_labels(
+    marbles: Query<&GlobalTransform, With<Marble>>,
+    mut labels: Query<(&mut Transform, &mut TextFont, &MarbleLabel), Without<MarbleLabelOutline>>,
+    mut outlines: Query<(&mut Transform, &mut TextFont, &MarbleLabelOutline), Without<MarbleLabel>>,
+    camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+) {
+    let Ok((camera, camera_global_transform)) = camera_q.single() else { return };
+    let Some(viewport) = camera.logical_viewport_size() else { return };
+    // 2.2% del alto del viewport → tamaño relativo igual en ventana y en --record
+    let font_size = viewport.y * 0.022;
+    for (mut transform, mut font, MarbleLabel(marble_entity)) in &mut labels {
+        font.font_size = font_size;
+        let Ok(marble_global_transform) = marbles.get(*marble_entity) else { continue };
+        let above = marble_global_transform.translation() + Vec3::Y * 0.13;
+        if let Ok(screen_pos) = camera.world_to_viewport(camera_global_transform, above) {
+            transform.translation.x = screen_pos.x - viewport.x / 2.0;
+            transform.translation.y = viewport.y / 2.0 - screen_pos.y;
+            transform.translation.z = 0.0;
+        }
+    }
+    for (mut transform, mut font, outline) in &mut outlines {
+        font.font_size = font_size;
+        let Ok(marble_global_transform) = marbles.get(outline.marble) else { continue };
+        let above = marble_global_transform.translation() + Vec3::Y * 0.13;
+        if let Ok(screen_pos) = camera.world_to_viewport(camera_global_transform, above) {
+            transform.translation.x = screen_pos.x - viewport.x / 2.0 + outline.offset.x;
+            transform.translation.y = viewport.y / 2.0 - screen_pos.y + outline.offset.y;
+            transform.translation.z = -1.0; // detrás del texto blanco
+        }
+    }
 }

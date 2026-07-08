@@ -2,6 +2,8 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::{CollisionEvent, Velocity};
 use rapier_bevy::BakeEvents;
 
+use crate::game::baked_events::BakedEvent;
+
 #[derive(Component)]
 pub struct BouncyOnContact;
 
@@ -24,24 +26,28 @@ pub fn trigger_bouncy_pulse(
     mut commands: Commands,
     mut bake_events: Option<ResMut<BakeEvents>>,
 ) {
-    let base_amp     = 0.04_f32;
-    let speed_scale  = 0.05_f32;
-    let max_amp      = 0.28_f32;
+    let base_amplitude = 0.04_f32;
+    let speed_scale = 0.05_f32;
+    let max_amplitude = 0.28_f32;
 
     for event in events.read() {
         if let CollisionEvent::Started(a, b, _) = event {
             for (sphere, other) in [(*a, *b), (*b, *a)] {
-                let Ok(sphere_t) = bouncy.get(sphere) else { continue };
+                let Ok(sphere_transform) = bouncy.get(sphere) else { continue };
                 if already_pulsing.contains(sphere) { continue }
-                let closing = movers.get(other).ok().map(|(t, v)| {
-                    let dir = (t.translation - sphere_t.translation).normalize_or_zero();
-                    (-v.linvel.dot(dir)).max(0.0)
+                let closing = movers.get(other).ok().map(|(transform, velocity)| {
+                    let direction = (transform.translation - sphere_transform.translation).normalize_or_zero();
+                    (-velocity.linvel.dot(direction)).max(0.0)
                 }).unwrap_or(0.0);
-                let amp = (base_amp + closing * speed_scale).min(max_amp);
-                if let Some(ev) = bake_events.as_deref_mut() {
-                    ev.0.push(format!("bouncy {} {} {amp}", sphere_t.translation.x, sphere_t.translation.y));
+                let amplitude = (base_amplitude + closing * speed_scale).min(max_amplitude);
+                if let Some(events) = bake_events.as_deref_mut() {
+                    events.0.push(BakedEvent::Bouncy {
+                        x: sphere_transform.translation.x,
+                        y: sphere_transform.translation.y,
+                        amplitude,
+                    }.payload());
                 }
-                commands.entity(sphere).insert(BouncePulse { elapsed: 0.0, amplitude: amp });
+                commands.entity(sphere).insert(BouncePulse { elapsed: 0.0, amplitude });
             }
         }
     }
@@ -73,9 +79,9 @@ pub fn tick_bounce_cooldown(
     mut commands: Commands,
     mut cooldowns: Query<(Entity, &mut BounceCooldown)>,
 ) {
-    for (entity, mut cd) in &mut cooldowns {
-        cd.remaining -= time.delta_secs();
-        if cd.remaining <= 0.0 {
+    for (entity, mut cooldown) in &mut cooldowns {
+        cooldown.remaining -= time.delta_secs();
+        if cooldown.remaining <= 0.0 {
             commands.entity(entity).remove::<BounceCooldown>();
         }
     }

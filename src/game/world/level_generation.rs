@@ -1,93 +1,30 @@
-use super::background::ColorPalette;
-use super::level::{ModuleData, WorldObject, load_module};
-use super::marbles::Marble;
 use bevy::prelude::*;
-use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
 use rand::Rng;
 use rand::RngCore;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
-use rand::seq::SliceRandom;
 use rapier_bevy::{
-    AssetsLoading, BodyType, ColliderShape, ObjectDef, SimulationMode, VisualAppearance, VisualDef,
+    BakeEvents, BakeKey, BodyType, ColliderShape, ObjectDef, SimulationMode, VisualDef,
     spawn_object,
 };
-use rapier_bevy::{BakeEvents, BakeKey};
+
+use super::pickups::{
+    attach_effect_marker, resolve_slot_variant, should_skip_effect, spawn_invisible_sensor,
+    spawn_spinning_icon,
+};
+use super::structures::{spawn_floor, spawn_wall_segment, tinted_white};
+use crate::game::background::palette::ColorPalette;
+use crate::game::baked_events::BakedEvent;
+use crate::game::level::{ModuleData, WorldObject, load_module};
+use crate::game::marbles::Marble;
 
 #[derive(Resource)]
 pub struct LevelSeed(pub u64);
 
-/// Segundo de simulación en que se cierra el nivel con la finish line. Se deriva de la
-/// duración del video (`--record`) menos un margen, para que la meta se cruce unos
-/// segundos antes del final. Ver [`decide_level_action`].
 #[derive(Resource)]
 pub struct FinishTarget(pub f32);
 
-/// Reemplaza `VisualDef::white_matte()` con el color tintado de la paleta activa.
-fn tinted_white(color: Color) -> VisualDef {
-    VisualDef {
-        appearance: VisualAppearance::Color(color),
-        roughness: 0.85,
-        ..Default::default()
-    }
-}
-
-pub fn setup(
-    mut commands: Commands,
-    mode: Res<SimulationMode>,
-    seed: Res<LevelSeed>,
-    finish_target: Res<FinishTarget>,
-    roster: Res<super::marbles::Roster>,
-    palette: Res<ColorPalette>,
-    asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut assets_loading: Option<ResMut<AssetsLoading>>,
-) {
-    let spawn_y = 0.0;
-    let top_margin = 0.6;
-    let walls_top = 2.0;
-    let first_module_top = spawn_y - top_margin;
-
-    // Paredes por tramo (sin border_radius para que no se vean las orillas/junturas);
-    // cada módulo añade su tramo en generate_level. Un mesh único de toda la columna
-    // reventaba el render por las sombras, así que se generan acotados al nivel visible.
-    let obstacle_color = palette.obstacle_color();
-    spawn_wall_segment(
-        walls_top,
-        first_module_top,
-        obstacle_color,
-        &mut commands,
-        &mode,
-        &asset_server,
-        &mut meshes,
-        &mut materials,
-    );
-    commands.insert_resource(LevelGen::new(seed.0, first_module_top, finish_target.0));
-
-    super::marbles::spawn_marbles(
-        &mut commands,
-        &mode,
-        &asset_server,
-        &mut meshes,
-        &mut materials,
-        &roster.0,
-        0.0,
-        spawn_y,
-        &mut assets_loading,
-    );
-}
-
-pub fn set_gravity(mut config: Query<&mut RapierConfiguration, With<DefaultRapierContext>>) {
-    if let Ok(mut cfg) = config.single_mut() {
-        cfg.gravity = Vec3::new(0.0, -3.0, 0.0);
-    }
-}
-
-/// Estado de la generación incremental del nivel. El nivel ya no se arma entero en
-/// Startup: `generate_level` añade módulos en runtime conforme baja la canica líder,
-/// y cierra con la finish line cuando el reloj se acerca al objetivo.
 #[derive(Resource)]
 pub struct LevelGen {
     rng: SmallRng,
@@ -99,7 +36,7 @@ pub struct LevelGen {
 }
 
 impl LevelGen {
-    fn new(seed: u64, first_module_top: f32, target_secs: f32) -> Self {
+    pub fn new(seed: u64, first_module_top: f32, target_secs: f32) -> Self {
         Self {
             rng: SmallRng::seed_from_u64(seed),
             next_top: first_module_top,
@@ -126,16 +63,14 @@ fn decide_level_action(
         return LevelGenerationAction::DoNothing;
     }
 
-    // Temprano mejor que nunca: en cuanto se pasa el objetivo de tiempo se cierra el
-    // nivel poniendo la meta en el horizonte actual (el fondo de lo generado, así queda
-    // limpia al final) y se deja de generar. La líder cae el último tramo y la cruza.
-    if elapsed_secs >= level_gen.target_secs {
+    let race_time_is_up = elapsed_secs >= level_gen.target_secs;
+    if race_time_is_up {
         return LevelGenerationAction::SpawnFinishLine;
     }
 
-    // Mientras haya tiempo, se mantiene pista por delante de la líder.
     let trigger_distance = 3.0;
-    if leader_y - level_gen.next_top < trigger_distance {
+    let leader_is_near_the_horizon = leader_y - level_gen.next_top < trigger_distance;
+    if leader_is_near_the_horizon {
         return LevelGenerationAction::GenerateModule;
     }
     LevelGenerationAction::DoNothing
@@ -161,8 +96,6 @@ pub fn generate_level(
         LevelGenerationAction::GenerateModule => {
             let name = pick_module(&mut level_gen);
             let top = level_gen.next_top;
-            // Cada módulo recibe su propio seed: las variantes dejan de depender del
-            // stream global, así el replay reconstruye el módulo exacto desde el evento.
             let module_seed = level_gen.rng.next_u64();
             let bottom = spawn_level_module(
                 name,
@@ -175,18 +108,18 @@ pub fn generate_level(
                 &mut meshes,
                 &mut materials,
             );
-            if let Some(ev) = bake_events.as_deref_mut() {
-                ev.0.push(format!("module {name} {top} {module_seed}"));
+            if let Some(events) = bake_events.as_deref_mut() {
+                events.0.push(BakedEvent::Module {
+                    name: name.to_string(),
+                    top,
+                    seed: module_seed,
+                }.payload());
             }
             level_gen.next_top = bottom;
             level_gen.last_module = Some(name);
             level_gen.modules_spawned += 1;
         }
         LevelGenerationAction::SpawnFinishLine => {
-            // La meta cierra el nivel en el horizonte (reemplaza el módulo que tocaría):
-            // la líder, ya cerca de él, cae los últimos metros y la cruza. Se deja un
-            // hueco antes de la meta (aire tras el último módulo) y otro debajo de ella
-            // (para ver caer la cola entre la meta y el suelo).
             close_level_with_finish(
                 level_gen.next_top,
                 obstacle_color,
@@ -196,8 +129,8 @@ pub fn generate_level(
                 &mut meshes,
                 &mut materials,
             );
-            if let Some(ev) = bake_events.as_deref_mut() {
-                ev.0.push(format!("finish {}", level_gen.next_top));
+            if let Some(events) = bake_events.as_deref_mut() {
+                events.0.push(BakedEvent::Finish { top: level_gen.next_top }.payload());
             }
             level_gen.finish_spawned = true;
         }
@@ -205,10 +138,7 @@ pub fn generate_level(
     }
 }
 
-/// Spawnea un módulo completo (obstáculos + variantes + tramo de pared) de forma
-/// reproducible: `module_seed` aísla el RNG de las variantes, así el mismo evento
-/// horneado reconstruye el módulo idéntico en replay. Devuelve el nuevo horizonte.
-pub(crate) fn spawn_level_module(
+pub fn spawn_level_module(
     name: &str,
     top: f32,
     module_seed: u64,
@@ -244,9 +174,7 @@ pub(crate) fn spawn_level_module(
     bottom
 }
 
-/// Cierra el nivel en el horizonte: pared final, suelo y la meta, con aire antes de
-/// la meta y debajo de ella (para ver caer la cola de canicas).
-pub(crate) fn close_level_with_finish(
+pub fn close_level_with_finish(
     next_top: f32,
     obstacle_color: Color,
     commands: &mut Commands,
@@ -278,12 +206,9 @@ pub(crate) fn close_level_with_finish(
         floor_y,
         obstacle_color,
     );
-    super::finish::spawn_finish_line(commands, meshes, materials, asset_server, finish_y);
+    crate::game::finish::spawn_finish_line(commands, meshes, materials, asset_server, finish_y);
 }
 
-/// Elige el siguiente módulo del pool ponderado, sin repetir el anterior. El primer
-/// módulo nunca es `spheres` (hoy atora las canicas al arrancar; regla de generación,
-/// no parche de la física del módulo).
 fn pick_module(level_gen: &mut LevelGen) -> &'static str {
     let pool: &[(&'static str, u32)] = &[
         ("crosses", 5),
@@ -313,38 +238,26 @@ fn pick_module(level_gen: &mut LevelGen) -> &'static str {
     }
 }
 
-/// Módulos-compuerta: su función es frenar al líder EN pantalla para que el pelotón
-/// lo alcance. Fuera de pantalla harían lo contrario — detener a los rezagados sin
-/// que se vea, fabricando monopolio — así que solo ellos se apagan al salir de
-/// cuadro. Los demás módulos siguen activos siempre: si todo soltara a las
-/// rezagadas, el pelotón llegaría comprimido y la carrera se sentiría falsa.
 fn module_acts_as_gate(name: &str) -> bool {
     matches!(name, "toruses" | "bouncy_walls" | "bars")
 }
 
-/// Tramo vertical del módulo-compuerta al que pertenece un collider (solo los
-/// módulos de [`module_acts_as_gate`] lo llevan). Cuando todo el módulo (su
-/// `bottom`) sale por arriba de la pantalla, sus colliders se apagan y las canicas
-/// de atrás caen en caída libre hasta entrar a cuadro.
 #[derive(Component, Clone, Copy)]
 pub struct ModuleSpan {
     pub bottom: f32,
 }
 
-/// Apaga (one-way: la cámara solo baja) los colliders de los módulos que ya salieron
-/// completos por el borde superior de la pantalla, con un margen para no apagar nada
-/// visible. Física pura: en bake queda registrado en las poses, el replay no lo corre.
 pub fn disable_modules_above_screen(
     camera: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
     modules: Query<(Entity, &ModuleSpan), Without<ColliderDisabled>>,
     mut commands: Commands,
 ) {
-    let Ok((projection, cam_xform)) = camera.single() else {
+    let Ok((projection, camera_transform)) = camera.single() else {
         return;
     };
     let exit_margin = 0.5;
     for (entity, span) in &modules {
-        if super::camera::world_y_above_screen(span.bottom, exit_margin, projection, cam_xform) {
+        if crate::game::camera::world_y_above_screen(span.bottom, exit_margin, projection, camera_transform) {
             commands.entity(entity).insert(ColliderDisabled);
         }
     }
@@ -362,9 +275,6 @@ fn spawn_module(
     materials: &mut Assets<StandardMaterial>,
 ) -> f32 {
     let rng = &mut SmallRng::seed_from_u64(module_seed);
-    // Key estable por cuerpo: (seed del módulo, índice del objeto). Las canicas usan
-    // 0..N como key — el seed (u64 aleatorio) no colisiona con eso en la práctica, y
-    // el bake hace assert de unicidad por si acaso.
     let body_key = |obj_idx: usize| BakeKey(module_seed ^ ((obj_idx as u64 + 1) << 32));
     let ModuleData { objects, .. } = load_module(name);
     let (y_min, y_max) = objects
@@ -431,7 +341,7 @@ fn spawn_module(
                 if *bouncy {
                     commands.entity(entity).insert((
                         ActiveEvents::COLLISION_EVENTS,
-                        super::bouncy::BouncyOnContact,
+                        crate::game::sensors::bouncy::BouncyOnContact,
                     ));
                 }
             }
@@ -464,7 +374,7 @@ fn spawn_module(
                 if *bouncy {
                     commands.entity(entity).insert((
                         ActiveEvents::COLLISION_EVENTS,
-                        super::bouncy::BouncyOnContact,
+                        crate::game::sensors::bouncy::BouncyOnContact,
                     ));
                 }
             }
@@ -582,197 +492,4 @@ fn spawn_module(
         }
     }
     level_top - trimmed_height
-}
-
-fn all_sensor_variants() -> &'static [&'static str] {
-    &["freeze", "shrink", "swap"]
-}
-
-/// Probabilidad de que un EffectSlot sea ignorado completamente (reduce frecuencia general).
-const EFFECT_SLOT_SKIP_CHANCE: f32 = 0.40;
-
-/// Pesos por variante: freeze 4×, swap 3×, shrink 1× para contrarrestar la ventaja de shrink.
-fn default_effect_weights() -> &'static [(&'static str, u32)] {
-    &[("freeze", 4), ("swap", 3), ("shrink", 1)]
-}
-
-fn resolve_slot_variant<'a>(
-    options: &'a [String],
-    world_y: f32,
-    rng: &mut SmallRng,
-) -> Option<&'a str> {
-    if rng.gen_range(0.0_f32..1.0) < EFFECT_SLOT_SKIP_CHANCE {
-        return None;
-    }
-    if options.is_empty() {
-        let weighted: Vec<&str> = default_effect_weights()
-            .iter()
-            .flat_map(|(name, w)| std::iter::repeat(*name).take(*w as usize))
-            .filter(|v| !should_skip_effect(v, world_y))
-            .collect();
-        weighted.choose(rng).copied()
-    } else {
-        let valid: Vec<&str> = options
-            .iter()
-            .map(|s| s.as_str())
-            .filter(|v| !should_skip_effect(v, world_y))
-            .collect();
-        valid.choose(rng).copied()
-    }
-}
-
-fn should_skip_effect(variant: &str, world_y: f32) -> bool {
-    let swap_block_above_y = -3.0_f32;
-    variant == "swap" && world_y > swap_block_above_y
-}
-
-fn spawn_invisible_sensor(
-    commands: &mut Commands,
-    position: Vec3,
-    w: f32,
-    h: f32,
-    rot: f32,
-    mode: &SimulationMode,
-    asset_server: &AssetServer,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
-) -> Entity {
-    spawn_object(
-        commands,
-        ObjectDef {
-            shape: ColliderShape::Box {
-                hx: w / 2.0,
-                hy: h / 2.0,
-                hz: crate::UNIT / 4.0,
-            },
-            position,
-            rotation: Quat::from_rotation_z(rot),
-            body: BodyType::Static,
-            sensor: true,
-            visual: None,
-            ..Default::default()
-        },
-        mode,
-        asset_server,
-        meshes,
-        materials,
-    )
-}
-
-fn attach_effect_marker(commands: &mut Commands, sensor: Entity, variant: &str) {
-    match variant {
-        "freeze" => {
-            commands.entity(sensor).insert(super::effects::FreezeEffect);
-        }
-        "shrink" => {
-            commands.entity(sensor).insert(super::effects::ShrinkEffect);
-        }
-        "swap" => {
-            commands.entity(sensor).insert(super::effects::SwapEffect);
-        }
-        other => panic!("Variante de effect desconocida: '{}'", other),
-    }
-}
-
-fn spawn_spinning_icon(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    sensor: Entity,
-    variant: &str,
-) {
-    let (axis, speed, scale) = icon_tuning_for(variant);
-    let scene = asset_server.load(format!("effects/{}.glb#Scene0", variant));
-    let icon = commands
-        .spawn((
-            SceneRoot(scene),
-            Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::splat(scale)),
-            super::effects::SpinningIcon { axis, speed },
-        ))
-        .id();
-    commands.entity(sensor).add_child(icon);
-}
-
-fn icon_tuning_for(variant: &str) -> (Vec3, f32, f32) {
-    match variant {
-        "freeze" => (Vec3::Y, 1.0, 13.5),
-        "shrink" => (Vec3::Y, 1.0, 0.046),
-        "swap" => (Vec3::Z, 2.0, 0.25),
-        _ => (Vec3::Y, 1.5, 0.05),
-    }
-}
-
-fn spawn_floor(
-    commands: &mut Commands,
-    mode: &SimulationMode,
-    asset_server: &AssetServer,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
-    floor_y: f32,
-    obstacle_color: Color,
-) {
-    // Grueso a propósito: las canicas llegan a ~20 m/s y un suelo delgado lo atraviesan
-    // (tunneling) aunque tengan CCD. Con varios metros de grosor se quedan dentro varios
-    // ticks y el solver las frena. El borde superior queda en floor_y.
-    let hy = 3.0_f32;
-    spawn_object(
-        commands,
-        ObjectDef {
-            shape: ColliderShape::Box {
-                hx: 10.0,
-                hy,
-                hz: 3.0,
-            },
-            position: Vec3::new(0.0, floor_y - hy, 0.0),
-            visual: Some(VisualDef {
-                border_radius: Some(0.02),
-                ..tinted_white(obstacle_color)
-            }),
-            restitution: Some(0.05),
-            friction: Some(0.7),
-            ..Default::default()
-        },
-        mode,
-        asset_server,
-        meshes,
-        materials,
-    );
-}
-
-fn spawn_wall_segment(
-    top: f32,
-    bottom: f32,
-    obstacle_color: Color,
-    commands: &mut Commands,
-    mode: &SimulationMode,
-    asset_server: &AssetServer,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
-) {
-    let half_h = (top - bottom) / 2.0;
-    let center_y = (top + bottom) / 2.0;
-    let half_width = 0.55;
-    let wall_shape = ColliderShape::Box {
-        hx: 0.05,
-        hy: half_h,
-        hz: crate::UNIT / 4.0,
-    };
-
-    // Sin border_radius: las esquinas redondeadas de cada tramo eran las orillas que
-    // delataban las junturas. Rectos y contiguos se ven como una pared continua.
-    for x_sign in [-1.0_f32, 1.0] {
-        spawn_object(
-            commands,
-            ObjectDef {
-                shape: wall_shape.clone(),
-                position: Vec3::new(x_sign * (half_width + 0.05), center_y, 0.0),
-                visual: Some(tinted_white(obstacle_color)),
-                restitution: Some(0.05),
-                ..Default::default()
-            },
-            mode,
-            asset_server,
-            meshes,
-            materials,
-        );
-    }
 }

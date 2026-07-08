@@ -5,8 +5,6 @@ use super::marbles::{Marble, MarbleName};
 #[derive(Component)]
 pub struct FinishLine;
 
-/// Altura de la meta. El cruce se detecta comparando la Y de cada canica con esta línea
-/// (no con un sensor físico), así no hay tunneling por más rápido que caiga la canica.
 #[derive(Resource, Default)]
 pub struct FinishLineY(pub Option<f32>);
 
@@ -22,10 +20,6 @@ pub fn spawn_finish_line(
     asset_server: &AssetServer,
     y: f32,
 ) {
-    // Quad vertical con la bandera de meta a cuadros, mirando a la cámara (plano XY,
-    // normal +Z). Solo es visual: el cruce lo decide `check_finish_crossing` por la Y,
-    // no por física. Banda delgada, pegada al frente de las paredes (su cara delantera
-    // está en z = +UNIT/4), no en medio de la profundidad.
     let width = 1.1;
     let height = 0.14;
     let z_front = crate::UNIT / 4.0;

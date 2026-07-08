@@ -3,14 +3,7 @@ use bevy::render::mesh::{Indices, PrimitiveTopology};
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy::sprite::ColorMaterial;
 
-use super::effects::{Frozen, Shrunk};
-use super::marbles::Marble;
-
-const FREEZE_COLOR: Color = Color::srgba(0.35, 0.88, 1.0, 1.0);
-const SHRINK_COLOR: Color = Color::srgba(0.35, 1.0, 0.45, 1.0);
-const RING_BG: Color = Color::srgba(1.0, 1.0, 1.0, 0.22);
-const ARC_RADIUS_PX: f32 = 11.0;
-const BADGE_OFFSET: Vec3 = Vec3::new(0.13, 0.15, 0.0);
+use crate::game::marbles::Marble;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum EffectKind {
@@ -28,80 +21,28 @@ pub struct EffectTimerBadge {
     pub arc_mesh: Handle<Mesh>,
 }
 
-// Marcadores en el marble para evitar doble-spawn y para cleanup
-#[derive(Component)]
-pub struct FreezeTimerMarker;
-
-#[derive(Component)]
-pub struct ShrinkTimerMarker;
-
-// Detecta marbles recién congelados (sin badge todavía) usando polling en lugar de
-// Added<Frozen> — más robusto cuando el componente viene de FixedUpdate.
-pub fn manage_freeze_badges(
-    mut commands: Commands,
-    time: Res<Time>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut mats: ResMut<Assets<ColorMaterial>>,
-    needs_badge: Query<(Entity, &Frozen), (With<Marble>, Without<FreezeTimerMarker>)>,
-    lost_freeze: Query<Entity, (With<Marble>, With<FreezeTimerMarker>, Without<Frozen>)>,
-    badges: Query<(Entity, &EffectTimerBadge)>,
-) {
-    // Spawn badge para nuevos congelados
-    for (marble_e, frozen) in &needs_badge {
-        spawn_badge(&mut commands, &time, &mut meshes, &mut mats, marble_e, frozen.expires_at, EffectKind::Freeze);
-        commands.entity(marble_e).insert(FreezeTimerMarker);
-    }
-    // Despawnear badge cuando ya no está congelado
-    for marble_e in &lost_freeze {
-        for (badge_e, badge) in &badges {
-            if badge.marble == marble_e && badge.kind == EffectKind::Freeze {
-                commands.entity(badge_e).despawn();
-            }
-        }
-        commands.entity(marble_e).remove::<FreezeTimerMarker>();
-    }
-}
-
-pub fn manage_shrink_badges(
-    mut commands: Commands,
-    time: Res<Time>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut mats: ResMut<Assets<ColorMaterial>>,
-    needs_badge: Query<(Entity, &Shrunk), (With<Marble>, Without<ShrinkTimerMarker>)>,
-    lost_shrink: Query<Entity, (With<Marble>, With<ShrinkTimerMarker>, Without<Shrunk>)>,
-    badges: Query<(Entity, &EffectTimerBadge)>,
-) {
-    for (marble_e, shrunk) in &needs_badge {
-        spawn_badge(&mut commands, &time, &mut meshes, &mut mats, marble_e, shrunk.expires_at, EffectKind::Shrink);
-        commands.entity(marble_e).insert(ShrinkTimerMarker);
-    }
-    for marble_e in &lost_shrink {
-        for (badge_e, badge) in &badges {
-            if badge.marble == marble_e && badge.kind == EffectKind::Shrink {
-                commands.entity(badge_e).despawn();
-            }
-        }
-        commands.entity(marble_e).remove::<ShrinkTimerMarker>();
-    }
-}
-
-fn spawn_badge(
+pub fn spawn_badge(
     commands: &mut Commands,
     time: &Time,
     meshes: &mut Assets<Mesh>,
-    mats: &mut Assets<ColorMaterial>,
-    marble_e: Entity,
+    color_materials: &mut Assets<ColorMaterial>,
+    marble_entity: Entity,
     expires_at: f32,
     kind: EffectKind,
 ) {
-    let arc_color = if kind == EffectKind::Freeze { FREEZE_COLOR } else { SHRINK_COLOR };
+    let freeze_color = Color::srgba(0.35, 0.88, 1.0, 1.0);
+    let shrink_color = Color::srgba(0.35, 1.0, 0.45, 1.0);
+    let ring_bg = Color::srgba(1.0, 1.0, 1.0, 0.22);
+    let arc_radius_px = 11.0_f32;
+
+    let arc_color = if kind == EffectKind::Freeze { freeze_color } else { shrink_color };
     // arc_mesh se crea aquí y se guarda en el componente; los hijos comparten el handle
     let arc_mesh_handle = meshes.add(build_arc_mesh(1.0));
 
     commands
         .spawn((
             EffectTimerBadge {
-                marble: marble_e,
+                marble: marble_entity,
                 expires_at,
                 started_at: time.elapsed_secs(),
                 kind,
@@ -117,14 +58,14 @@ fn spawn_badge(
             // Fondo — anillo siempre completo
             parent.spawn((
                 Mesh2d(meshes.add(build_arc_mesh(1.0))),
-                MeshMaterial2d(mats.add(ColorMaterial::from_color(RING_BG))),
-                Transform::from_scale(Vec3::splat(ARC_RADIUS_PX)),
+                MeshMaterial2d(color_materials.add(ColorMaterial::from_color(ring_bg))),
+                Transform::from_scale(Vec3::splat(arc_radius_px)),
             ));
             // Arco — mismo handle que badge.arc_mesh; se muta in-place en update_badges
             parent.spawn((
                 Mesh2d(arc_mesh_handle),
-                MeshMaterial2d(mats.add(ColorMaterial::from_color(arc_color))),
-                Transform::from_scale(Vec3::splat(ARC_RADIUS_PX)).with_translation(Vec3::Z * 0.5),
+                MeshMaterial2d(color_materials.add(ColorMaterial::from_color(arc_color))),
+                Transform::from_scale(Vec3::splat(arc_radius_px)).with_translation(Vec3::Z * 0.5),
             ));
         });
 }
@@ -136,10 +77,11 @@ pub fn update_badges(
     mut badges: Query<(&EffectTimerBadge, &mut Transform)>,
     camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
-    let Ok((camera, cam_gt)) = camera_q.single() else { return };
+    let badge_offset = Vec3::new(0.13, 0.15, 0.0);
+    let Ok((camera, camera_global_transform)) = camera_q.single() else { return };
     let Some(viewport) = camera.logical_viewport_size() else { return };
 
-    for (badge, mut badge_t) in &mut badges {
+    for (badge, mut badge_transform) in &mut badges {
         let remaining = (badge.expires_at - time.elapsed_secs()).max(0.0);
         let total = (badge.expires_at - badge.started_at).max(0.01);
         let fraction = (remaining / total).clamp(0.0, 1.0);
@@ -150,12 +92,12 @@ pub fn update_badges(
             rebuild_arc_in_place(mesh, fraction);
         }
 
-        let Ok(marble_gt) = marbles.get(badge.marble) else { continue };
-        let world_pos = marble_gt.translation() + BADGE_OFFSET;
-        if let Ok(screen) = camera.world_to_viewport(cam_gt, world_pos) {
-            badge_t.translation.x = screen.x - viewport.x / 2.0;
-            badge_t.translation.y = viewport.y / 2.0 - screen.y;
-            badge_t.translation.z = 20.0;
+        let Ok(marble_global_transform) = marbles.get(badge.marble) else { continue };
+        let world_pos = marble_global_transform.translation() + badge_offset;
+        if let Ok(screen) = camera.world_to_viewport(camera_global_transform, world_pos) {
+            badge_transform.translation.x = screen.x - viewport.x / 2.0;
+            badge_transform.translation.y = viewport.y / 2.0 - screen.y;
+            badge_transform.translation.z = 20.0;
         }
     }
 }

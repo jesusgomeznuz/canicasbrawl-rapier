@@ -8,8 +8,8 @@ use rapier_bevy::{
 
 use crate::args::RosterSpec;
 use crate::game;
-use crate::game::background::ColorPalette;
-use crate::game::marbles::MarbleConfig;
+use crate::game::background::palette::ColorPalette;
+use crate::game::roster::MarbleConfig;
 use crate::production;
 
 pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPalette) {
@@ -32,27 +32,6 @@ pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPale
     app.run();
 }
 
-fn resolve_roster(spec: RosterSpec) -> Vec<MarbleConfig> {
-    match spec {
-        RosterSpec::Default => game::marbles::build_roster(None),
-        RosterSpec::Characters(names) => game::marbles::build_roster(Some(names)),
-        RosterSpec::Slots(n) => game::marbles::slots_roster(n),
-    }
-    .unwrap_or_else(|err| {
-        eprintln!("Error de roster: {err}");
-        std::process::exit(1);
-    })
-}
-
-fn finish_target_secs() -> f32 {
-    let video_secs = record_duration()
-        .or_else(bake_duration)
-        .map(|d| d as f32)
-        .unwrap_or(60.0);
-    let tail_of_falling_marbles_secs = 12.0;
-    video_secs - tail_of_falling_marbles_secs
-}
-
 fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorPalette) {
     let clear = palette.clear_color();
     app.insert_resource(ClearColor(clear))
@@ -62,19 +41,21 @@ fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorP
         .insert_resource(game::finish::RaceResult::default())
         .insert_resource(game::finish::FinishLineY::default())
         .insert_resource(game::leader::RaceLeader::default())
-        .insert_resource(game::marbles::Roster(roster))
-        .insert_resource(game::world::LevelSeed(seed))
-        .insert_resource(game::world::FinishTarget(finish_target_secs()))
+        .insert_resource(game::roster::Roster(roster))
+        .insert_resource(game::world::level_generation::LevelSeed(seed))
+        .insert_resource(game::world::level_generation::FinishTarget(
+            finish_target_secs(),
+        ))
         .add_systems(
             Startup,
             (
                 game::camera::spawn_camera_and_lights,
-                game::camera::spawn_leader_crown,
-                game::world::setup,
-                game::world::set_gravity,
-                game::background::spawn_sky,
-                game::background::spawn_stars,
-                game::background::spawn_clouds,
+                game::leader::spawn_crown,
+                game::world::setup::setup,
+                game::world::setup::set_gravity,
+                game::background::sky::spawn_sky,
+                game::background::stars::spawn_stars,
+                game::background::clouds::spawn_clouds,
                 game::hud::spawn_hud,
             ),
         );
@@ -94,12 +75,12 @@ fn on_step(app: &mut App) {
     .add_systems(
         FixedUpdate,
         (
-            game::effects::try_unfreeze,
-            game::effects::try_unshrink,
-            game::effects::fade_swap_rings,
-            game::effects::spin_icons,
-            game::bouncy::animate_bounce_pulse,
-            game::bouncy::tick_bounce_cooldown,
+            game::sensors::freeze::try_unfreeze,
+            game::sensors::shrink::try_unshrink,
+            game::sensors::swap::fade_swap_rings,
+            game::sensors::icons::spin_icons,
+            game::sensors::bouncy::animate_bounce_pulse,
+            game::sensors::bouncy::tick_bounce_cooldown,
             game::camera::camera_follows_lowest_marble,
         )
             .after(PhysicsSet::Writeback),
@@ -115,12 +96,13 @@ fn on_frame_update(app: &mut App) {
     app.add_systems(
         Update,
         (
-            game::background::update_sky_with_camera,
-            game::background::twinkle_stars,
-            game::background::update_clouds,
-            game::effect_timers::manage_freeze_badges,
-            game::effect_timers::manage_shrink_badges,
-            game::effect_timers::update_badges,
+            game::background::sky::update_sky_with_camera,
+            game::background::stars::stars_follow_camera,
+            game::background::stars::twinkle_stars,
+            game::background::clouds::update_clouds,
+            game::sensors::freeze::manage_freeze_badges,
+            game::sensors::shrink::manage_shrink_badges,
+            game::sensors::badges::update_badges,
         ),
     )
     .add_systems(Update, game::hud::update_hud)
@@ -131,8 +113,8 @@ fn on_final_positions(app: &mut App) {
     app.add_systems(
         PostUpdate,
         (
-            game::camera::update_marble_labels,
-            game::camera::update_leader_crown,
+            game::marbles::update_marble_labels,
+            game::leader::crown_follows_leader,
         )
             .after(TransformSystem::TransformPropagate),
     );
@@ -146,12 +128,12 @@ fn register_physics_contact_systems(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (
-            game::world::generate_level,
-            game::world::disable_modules_above_screen,
-            game::effects::on_freeze_contact,
-            game::effects::on_shrink_contact,
-            game::effects::on_swap_contact,
-            game::bouncy::trigger_bouncy_pulse,
+            game::world::level_generation::generate_level,
+            game::world::level_generation::disable_modules_above_screen,
+            game::sensors::freeze::on_freeze_contact,
+            game::sensors::shrink::on_shrink_contact,
+            game::sensors::swap::on_swap_contact,
+            game::sensors::bouncy::trigger_bouncy_pulse,
         )
             .after(PhysicsSet::Writeback),
     );
@@ -166,4 +148,25 @@ fn register_replay_driven_systems(app: &mut App) {
         )
             .after(PhysicsSet::Writeback),
     );
+}
+
+fn resolve_roster(spec: RosterSpec) -> Vec<MarbleConfig> {
+    match spec {
+        RosterSpec::Default => game::roster::build_roster(None),
+        RosterSpec::Characters(names) => game::roster::build_roster(Some(names)),
+        RosterSpec::Slots(n) => game::roster::slots_roster(n),
+    }
+    .unwrap_or_else(|err| {
+        eprintln!("Error de roster: {err}");
+        std::process::exit(1);
+    })
+}
+
+fn finish_target_secs() -> f32 {
+    let video_secs = record_duration()
+        .or_else(bake_duration)
+        .map(|d| d as f32)
+        .unwrap_or(60.0);
+    let tail_of_falling_marbles_secs = 12.0;
+    video_secs - tail_of_falling_marbles_secs
 }

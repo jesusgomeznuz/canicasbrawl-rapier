@@ -86,9 +86,10 @@ impl WorldObject {
 }
 
 fn torus_outer_radius(model_name: &str) -> Option<f32> {
-    let mut parts = model_name.split('_');
-    if parts.next()? != "torus" { return None; }
-    let major_mm: i32 = parts.next()?.trim_start_matches('R').parse().ok()?;
-    let minor_mm: i32 = parts.next()?.trim_start_matches('r').parse().ok()?;
+    let ["torus", major, minor] = model_name.split('_').collect::<Vec<_>>()[..] else {
+        return None;
+    };
+    let major_mm: i32 = major.trim_start_matches('R').parse().ok()?;
+    let minor_mm: i32 = minor.trim_start_matches('r').parse().ok()?;
     Some((major_mm + minor_mm) as f32 / 1000.0)
 }

@@ -1,31 +1,24 @@
-use super::leader::RaceLeader;
-use super::marbles::{Marble, MarbleLabel, MarbleLabelOutline};
+use super::marbles::Marble;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::prelude::*;
 use bevy::render::camera::RenderTarget;
-use bevy::text::TextLayoutInfo;
 use rapier_bevy::OffscreenTarget;
 
 pub fn spawn_camera_and_lights(mut commands: Commands, offscreen: Option<Res<OffscreenTarget>>) {
-    let render_target: Option<RenderTarget> = offscreen
+    let render_target = offscreen
         .as_ref()
-        .map(|o| RenderTarget::Image(o.image.clone().into()));
+        .map(|offscreen_target| RenderTarget::Image(offscreen_target.image.clone().into()))
+        .unwrap_or_default();
 
-    let mut cam3d = Camera::default();
-    if let Some(ref t) = render_target {
-        cam3d.target = t.clone();
-    }
-    // Arranca ya en la pose de juego (misma que camera_follows_lowest_marble: z=2.5,
-    // mirando recto). La canica más baja descansa ~0.10 bajo el centro de spawn, así
-    // que la cámara nace ahí enmarcándola: sin el salto brusco del frame 0.
+    let world_camera = Camera {
+        target: render_target.clone(),
+        ..default()
+    };
     let lowest_marble_below_center = 0.10;
     let start_pose = Transform::from_xyz(0.0, -lowest_marble_below_center, 2.5);
     commands
-        .spawn((Camera3d::default(), cam3d, Tonemapping::None, start_pose))
+        .spawn((Camera3d::default(), world_camera, Tonemapping::None, start_pose))
         .with_children(|camera| {
-            // Tres cuartos desde arriba-derecha: ~46° vertical, ~28° horizontal.
-            // Estándar en juegos cartoon/arcade — da volumen a las esferas sin
-            // oscurecer las caras. La ambient actúa como luz de relleno suave.
             camera.spawn((
                 DirectionalLight {
                     illuminance: 12_000.0,
@@ -36,17 +29,13 @@ pub fn spawn_camera_and_lights(mut commands: Commands, offscreen: Option<Res<Off
             ));
         });
 
-    // Camera2d renderiza Text2d (nicknames) encima de la escena 3D.
-    // ClearColorConfig::None evita que borre el frame 3D ya renderizado.
-    let mut cam2d = Camera {
+    let overlay_camera = Camera {
         order: 1,
         clear_color: ClearColorConfig::None,
+        target: render_target,
         ..default()
     };
-    if let Some(ref t) = render_target {
-        cam2d.target = t.clone();
-    }
-    commands.spawn((Camera2d, cam2d, IsDefaultUiCamera));
+    commands.spawn((Camera2d, overlay_camera, IsDefaultUiCamera));
 
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
@@ -68,7 +57,7 @@ pub fn camera_follows_lowest_marble(
     let Some(lowest_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else {
         return;
     };
-    let Ok(mut cam) = camera.single_mut() else {
+    let Ok(mut camera_transform) = camera.single_mut() else {
         return;
     };
 
@@ -78,137 +67,44 @@ pub fn camera_follows_lowest_marble(
         target_y
     } else {
         let alpha = 1.0 - (-time.delta_secs() * sharpness).exp();
-        cam.translation.y + (target_y - cam.translation.y) * alpha
+        camera_transform.translation.y + (target_y - camera_transform.translation.y) * alpha
     };
-    cam.translation = Vec3::new(0.0, new_y, camera_z);
-    cam.rotation = Quat::IDENTITY;
+    camera_transform.translation = Vec3::new(0.0, new_y, camera_z);
+    camera_transform.rotation = Quat::IDENTITY;
 }
 
-#[derive(Component)]
-pub struct LeaderCrown;
-
-pub fn spawn_leader_crown(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut assets_loading: Option<ResMut<rapier_bevy::AssetsLoading>>,
-) {
-    let handle: Handle<Image> = asset_server.load("img/crown.png");
-    if let Some(al) = assets_loading.as_deref_mut() {
-        al.0.push(handle.clone().untyped());
-    }
-    commands.spawn((
-        Sprite {
-            image: handle,
-            custom_size: Some(Vec2::splat(28.0)),
-            ..default()
-        },
-        Transform::default(),
-        Visibility::Hidden,
-        LeaderCrown,
-    ));
-}
-
-pub fn update_leader_crown(
-    leader: Res<RaceLeader>,
-    labels: Query<(&Transform, &TextLayoutInfo, &MarbleLabel), Without<LeaderCrown>>,
-    mut crown: Query<(&mut Transform, &mut Visibility), (With<LeaderCrown>, Without<MarbleLabel>)>,
-) {
-    let Ok((mut crown_t, mut crown_v)) = crown.single_mut() else {
-        return;
-    };
-    let Some(leader_marble) = leader.marble else {
-        *crown_v = Visibility::Hidden;
-        return;
-    };
-    let crown_size = 28.0_f32;
-    let gap = 6.0_f32;
-    for (label_t, layout, MarbleLabel(marble_entity)) in &labels {
-        if *marble_entity == leader_marble {
-            crown_t.translation.x =
-                label_t.translation.x - layout.size.x / 2.0 - crown_size / 2.0 - gap;
-            crown_t.translation.y = label_t.translation.y;
-            crown_t.translation.z = label_t.translation.z;
-            *crown_v = Visibility::Visible;
-            return;
-        }
-    }
-    *crown_v = Visibility::Hidden;
-}
-
-/// Aspecto del diseño (vertical 9:16). Fijo a propósito: el aspecto NO se lee del
-/// render target porque en bake (headless) no existe viewport, y este check decide
-/// FÍSICA (qué sensores disparan) — debe dar lo mismo con ventana, --record o --bake.
-const DESIGN_ASPECT: f32 = 9.0 / 16.0;
-
-pub fn world_pos_on_screen(world_pos: Vec3, projection: &Projection, cam_xform: &GlobalTransform) -> bool {
-    let Projection::Perspective(persp) = projection else {
+pub fn world_pos_on_screen(world_position: Vec3, projection: &Projection, camera_transform: &GlobalTransform) -> bool {
+    let design_aspect_9_16 = 9.0 / 16.0;
+    let Projection::Perspective(perspective) = projection else {
         return true;
     };
-    // Proyección manual en espacio de cámara: idéntica en todos los modos, a
-    // diferencia de world_to_viewport, que requiere un render target vivo.
-    let local = cam_xform.affine().inverse().transform_point3(world_pos);
-    let depth = -local.z;
+    let point_in_camera_space = camera_transform.affine().inverse().transform_point3(world_position);
+    let depth = -point_in_camera_space.z;
     if depth <= 0.0 {
         return false;
     }
-    let half_h = depth * (persp.fov * 0.5).tan();
-    let half_w = half_h * DESIGN_ASPECT;
-    local.x.abs() <= half_w && local.y.abs() <= half_h
+    let half_height = depth * (perspective.fov * 0.5).tan();
+    let half_width = half_height * design_aspect_9_16;
+    point_in_camera_space.x.abs() <= half_width && point_in_camera_space.y.abs() <= half_height
 }
 
-/// True si el punto (0, `world_y`, 0) del plano de la arena queda por encima del
-/// borde superior de la pantalla por más de `margin` metros. Misma proyección manual
-/// (y mismas razones) que [`world_pos_on_screen`]: decide FÍSICA, debe dar lo mismo
-/// con ventana, --record o --bake.
 pub fn world_y_above_screen(
     world_y: f32,
     margin: f32,
     projection: &Projection,
-    cam_xform: &GlobalTransform,
+    camera_transform: &GlobalTransform,
 ) -> bool {
-    let Projection::Perspective(persp) = projection else {
+    let Projection::Perspective(perspective) = projection else {
         return false;
     };
-    let local = cam_xform
+    let point_in_camera_space = camera_transform
         .affine()
         .inverse()
         .transform_point3(Vec3::new(0.0, world_y, 0.0));
-    let depth = -local.z;
+    let depth = -point_in_camera_space.z;
     if depth <= 0.0 {
         return false;
     }
-    let half_h = depth * (persp.fov * 0.5).tan();
-    local.y > half_h + margin
-}
-
-pub fn update_marble_labels(
-    marbles: Query<&GlobalTransform, With<Marble>>,
-    mut labels: Query<(&mut Transform, &mut TextFont, &MarbleLabel), Without<MarbleLabelOutline>>,
-    mut outlines: Query<(&mut Transform, &mut TextFont, &MarbleLabelOutline), Without<MarbleLabel>>,
-    camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-) {
-    let Ok((camera, cam_gt)) = camera_q.single() else { return };
-    let Some(viewport) = camera.logical_viewport_size() else { return };
-    // 2.2% del alto del viewport → tamaño relativo igual en ventana y en --record
-    let font_size = viewport.y * 0.022;
-    for (mut transform, mut font, MarbleLabel(marble_entity)) in &mut labels {
-        font.font_size = font_size;
-        let Ok(marble_gt) = marbles.get(*marble_entity) else { continue };
-        let above = marble_gt.translation() + Vec3::Y * 0.13;
-        if let Ok(screen_pos) = camera.world_to_viewport(cam_gt, above) {
-            transform.translation.x = screen_pos.x - viewport.x / 2.0;
-            transform.translation.y = viewport.y / 2.0 - screen_pos.y;
-            transform.translation.z = 0.0;
-        }
-    }
-    for (mut transform, mut font, outline) in &mut outlines {
-        font.font_size = font_size;
-        let Ok(marble_gt) = marbles.get(outline.marble) else { continue };
-        let above = marble_gt.translation() + Vec3::Y * 0.13;
-        if let Ok(screen_pos) = camera.world_to_viewport(cam_gt, above) {
-            transform.translation.x = screen_pos.x - viewport.x / 2.0 + outline.offset.x;
-            transform.translation.y = viewport.y / 2.0 - screen_pos.y + outline.offset.y;
-            transform.translation.z = -1.0; // detrás del texto blanco
-        }
-    }
+    let half_height = depth * (perspective.fov * 0.5).tan();
+    point_in_camera_space.y > half_height + margin
 }

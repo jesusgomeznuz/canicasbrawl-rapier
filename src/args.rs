@@ -1,6 +1,6 @@
 use rapier_bevy::SimulationMode;
 
-use crate::game::background::ColorPalette;
+use crate::game::background::palette::ColorPalette;
 
 pub enum Command {
     Simulation(SimulationMode, u64, RosterSpec, ColorPalette),

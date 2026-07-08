@@ -100,7 +100,9 @@ main
 ## Contrato bake/replay (al agregar contenido o efectos)
 
 El replay NO re-simula ni re-deriva nada: todo cruza de bake a replay como datos
-(poses por BakeKey, nivel y utilería por eventos horneados). Al extender el juego:
+(poses por BakeKey, nivel y utilería por eventos horneados). El contrato de datos
+vive en `../rapier-bevy/src/timeline.rs` (Timeline, Pose, BakeKey, BakeEvents,
+ReplayEvent). Al extender el juego:
 
 - **Módulo nuevo** (JSON via --process-modules): solo agregarlo al pool de
   `pick_module` con su peso. Spawn, BakeKeys y evento `module` son genéricos.

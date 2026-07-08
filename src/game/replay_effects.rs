@@ -1,21 +1,15 @@
 use bevy::prelude::*;
 use rapier_bevy::{ReplayEvent, SimulationMode};
 
-use super::background::ColorPalette;
-use super::bouncy::{BounceCooldown, BouncePulse, BouncyOnContact};
-use super::effects::{
-    FreezeEffect, Frozen, ShrinkEffect, Shrunk, SwapEffect, spawn_frozen_visual, spawn_swap_rings,
-};
+use super::background::palette::ColorPalette;
+use super::baked_events::BakedEvent;
+use super::sensors::bouncy::{BounceCooldown, BouncePulse, BouncyOnContact};
+use super::sensors::freeze::{FreezeEffect, Frozen, spawn_frozen_visual};
+use super::sensors::shrink::{ShrinkEffect, Shrunk};
+use super::sensors::swap::{SwapEffect, spawn_swap_rings};
 use super::marbles::{Marble, MarbleIndex};
-use super::world::{close_level_with_finish, spawn_level_module};
+use super::world::level_generation::{close_level_with_finish, spawn_level_module};
 
-/// Reproduce en replay todo lo que las poses no capturan. El NIVEL también: en
-/// replay `generate_level` no corre — cada módulo llega como evento horneado con
-/// su propio seed y se reconstruye idéntico por construcción (los módulos
-/// estáticos no tienen RigidBody, así que una divergencia ahí sería invisible
-/// para el assert de cuerpos; por eso el replay no re-deriva el mundo, lo lee).
-/// La utilería de efectos igual: sensor consumido, hielo, anillos, pulso bouncy.
-/// Los badges aparecen solos: sus sistemas reaccionan a Frozen/Shrunk.
 pub fn apply_replay_effects(
     mut events: EventReader<ReplayEvent>,
     marbles: Query<(Entity, &MarbleIndex), With<Marble>>,
@@ -33,102 +27,80 @@ pub fn apply_replay_effects(
     mut commands: Commands,
 ) {
     for ReplayEvent(payload) in events.read() {
-        let parts: Vec<&str> = payload.split_whitespace().collect();
-        match parts.as_slice() {
-            ["freeze", idx, x, y, dur] => {
-                let (Some(marble), Some(x), Some(y), Some(dur)) =
-                    (marble_by_index(&marbles, idx), num(x), num(y), num(dur))
-                else { continue };
+        match BakedEvent::parse(payload) {
+            BakedEvent::Freeze { marble, x, y, duration } => {
+                let Some(marble) = marble_by_index(&marbles, marble) else { continue };
                 let visual = spawn_frozen_visual(&mut commands, &mut meshes, &mut materials, marble);
                 commands.entity(marble).insert(Frozen {
-                    expires_at: time.elapsed_secs() + dur,
+                    expires_at: time.elapsed_secs() + duration,
                     visual,
                 });
                 despawn_sensor_near(&mut commands, freeze_sensors.iter(), x, y);
             }
-            ["shrink", idx, x, y, dur] => {
-                let (Some(marble), Some(x), Some(y), Some(dur)) =
-                    (marble_by_index(&marbles, idx), num(x), num(y), num(dur))
-                else { continue };
+            BakedEvent::Shrink { marble, x, y, duration } => {
+                let Some(marble) = marble_by_index(&marbles, marble) else { continue };
                 commands.entity(marble).insert(Shrunk {
-                    expires_at: time.elapsed_secs() + dur,
+                    expires_at: time.elapsed_secs() + duration,
                 });
                 despawn_sensor_near(&mut commands, shrink_sensors.iter(), x, y);
             }
-            ["swap", idx_a, idx_b, x, y] => {
-                let (Some(a), Some(b), Some(x), Some(y)) = (
-                    marble_by_index(&marbles, idx_a),
-                    marble_by_index(&marbles, idx_b),
-                    num(x),
-                    num(y),
+            BakedEvent::Swap { marble_a, marble_b, x, y } => {
+                let (Some(a), Some(b)) = (
+                    marble_by_index(&marbles, marble_a),
+                    marble_by_index(&marbles, marble_b),
                 ) else { continue };
                 spawn_swap_rings(&mut commands, &mut meshes, &mut materials, &time, a, b);
                 despawn_sensor_near(&mut commands, swap_sensors.iter(), x, y);
             }
-            ["module", name, top, module_seed] => {
-                let (Some(top), Ok(module_seed)) = (num(top), module_seed.parse::<u64>()) else { continue };
+            BakedEvent::Module { name, top, seed } => {
                 spawn_level_module(
-                    name, top, module_seed, palette.obstacle_color(),
+                    &name, top, seed, palette.obstacle_color(),
                     &mut commands, &mode, &asset_server, &mut meshes, &mut materials,
                 );
             }
-            ["finish", next_top] => {
-                let Some(next_top) = num(next_top) else { continue };
+            BakedEvent::Finish { top } => {
                 close_level_with_finish(
-                    next_top, palette.obstacle_color(),
+                    top, palette.obstacle_color(),
                     &mut commands, &mode, &asset_server, &mut meshes, &mut materials,
                 );
             }
-            ["bouncy", x, y, amp] => {
-                let (Some(x), Some(y), Some(amp)) = (num(x), num(y), num(amp)) else { continue };
+            BakedEvent::Bouncy { x, y, amplitude } => {
                 let target = Vec2::new(x, y);
                 let hit = bouncys.iter()
-                    .filter(|(e, _)| !pulsing.contains(*e))
-                    .map(|(e, t)| (e, t.translation.truncate().distance_squared(target)))
+                    .filter(|(entity, _)| !pulsing.contains(*entity))
+                    .map(|(entity, transform)| (entity, transform.translation.truncate().distance_squared(target)))
                     .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-                if let Some((sphere, d2)) = hit {
-                    if d2 < 0.25 * 0.25 {
-                        commands.entity(sphere).insert(BouncePulse { elapsed: 0.0, amplitude: amp });
+                if let Some((sphere, distance_squared)) = hit {
+                    if distance_squared < 0.25 * 0.25 {
+                        commands.entity(sphere).insert(BouncePulse { elapsed: 0.0, amplitude });
                     }
                 }
             }
-            _ => warn!("replay: evento horneado desconocido: {payload}"),
         }
     }
 }
 
-/// try_unfreeze no opera en replay (consulta el contexto de Rapier para no
-/// descongelar dentro de otra canica — irrelevante aquí: las poses ya están
-/// decididas). Este reemplazo solo expira el visual.
 pub fn expire_replay_freezes(
     time: Res<Time>,
     frozen: Query<(Entity, &Frozen), With<Marble>>,
     mut commands: Commands,
 ) {
-    for (marble, f) in &frozen {
-        if time.elapsed_secs() < f.expires_at {
+    for (marble, frozen_state) in &frozen {
+        if time.elapsed_secs() < frozen_state.expires_at {
             continue;
         }
-        commands.entity(f.visual).despawn();
+        commands.entity(frozen_state.visual).despawn();
         commands.entity(marble).remove::<Frozen>();
     }
 }
 
 fn marble_by_index(
     marbles: &Query<(Entity, &MarbleIndex), With<Marble>>,
-    raw: &str,
+    want: usize,
 ) -> Option<Entity> {
-    let want: usize = raw.parse().ok()?;
-    marbles.iter().find(|(_, idx)| idx.0 == want).map(|(e, _)| e)
+    marbles.iter().find(|(_, index)| index.0 == want).map(|(entity, _)| entity)
 }
 
-fn num(raw: &str) -> Option<f32> {
-    raw.parse().ok()
-}
-
-/// El sensor del evento se identifica por posición: la generación del nivel es
-/// determinista, así que en replay existe un sensor del mismo tipo en las mismas
-/// coordenadas que tuvo en el bake.
 fn despawn_sensor_near<'a>(
     commands: &mut Commands,
     sensors: impl Iterator<Item = (Entity, &'a Transform)>,
@@ -137,10 +109,10 @@ fn despawn_sensor_near<'a>(
 ) {
     let target = Vec2::new(x, y);
     let nearest = sensors
-        .map(|(e, t)| (e, t.translation.truncate().distance_squared(target)))
+        .map(|(entity, transform)| (entity, transform.translation.truncate().distance_squared(target)))
         .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-    if let Some((sensor, d2)) = nearest {
-        if d2 < 0.25 * 0.25 {
+    if let Some((sensor, distance_squared)) = nearest {
+        if distance_squared < 0.25 * 0.25 {
             commands.entity(sensor).despawn();
         }
     }
