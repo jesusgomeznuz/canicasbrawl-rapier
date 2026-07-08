@@ -10,6 +10,9 @@ pub struct RaceLeader {
     locked: bool,
 }
 
+#[derive(Component)]
+pub struct LeaderCrown;
+
 pub fn update_race_leader(
     marbles: Query<(Entity, &Transform), With<Marble>>,
     result: Res<RaceResult>,
@@ -29,16 +32,6 @@ pub fn update_race_leader(
         leader.marble = Some(front_runner);
     }
 }
-
-fn lowest_marble(marbles: &Query<(Entity, &Transform), With<Marble>>) -> Option<(Entity, f32)> {
-    marbles
-        .iter()
-        .map(|(e, t)| (e, t.translation.y))
-        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-}
-
-#[derive(Component)]
-pub struct LeaderCrown;
 
 pub fn spawn_crown(
     mut commands: Commands,
@@ -86,4 +79,11 @@ pub fn crown_follows_leader(
         }
     }
     *crown_visibility = Visibility::Hidden;
+}
+
+fn lowest_marble(marbles: &Query<(Entity, &Transform), With<Marble>>) -> Option<(Entity, f32)> {
+    marbles
+        .iter()
+        .map(|(e, t)| (e, t.translation.y))
+        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
 }

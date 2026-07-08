@@ -64,22 +64,20 @@ El engine no conoce al juego. El juego consume el engine vía `engine::game_app(
 
 ```
 src/
-  main.rs              parse_command + match top-level (4 modos)
+  main.rs              parse_command + match top-level (3 comandos)
   args.rs              parseo CLI → Command
   simulation.rs        arma el App por fases: on_start / on_step / on_frame_update
-                       / after_frame_update / on_exit + match ¿replay?
+                       / after_frame_update / on_exit + if ¿no hay timeline que reproducir?
   process_modules.rs   raw JSON Figma → módulo final
   game/
     race_events.rs     ADUANA de eventos: enum RaceEvent, payload+parse juntos
     staging.rs         escenografía única de ambos mundos (consume RaceEvent)
-    level.rs           load_module → ModuleData (aduana del JSON de módulos)
     marbles.rs         la canica: cuerpo, mesh, cara, etiquetas
     roster.rs          casting: quién corre (build_roster / slots_roster)
     camera.rs          cámara, luces y checks de encuadre
     finish.rs          meta y orden de llegada
     leader.rs          quién va ganando + su corona
-    hud.rs             overlay 2D
-    world/             setup, level_generation, pickups, structures
+    world/             setup, level_generation, modules (aduana del JSON), pickups, structures
     sensors/           freeze, shrink, swap, bouncy + badges e icons compartidos
     background/        palette, sky, stars, clouds
   production/

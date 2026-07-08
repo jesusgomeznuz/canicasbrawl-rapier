@@ -19,54 +19,6 @@ pub struct BackgroundCloud {
     float_frequency: f32,
 }
 
-struct CloudLayer {
-    z: f32,
-    count: u32,
-    color: Color,
-    scale_min: f32,
-    scale_max: f32,
-    x_spread: f32,
-    float_amplitude: f32,
-    // Fracción de camera_y que sigue la capa. 1.0 = pegada a la cámara (sin parallax).
-    // <1.0 → se rezaga: cuanto más bajo, más sube en pantalla cuando la cámara baja.
-    parallax_factor: f32,
-}
-
-fn cloud_layers(palette: &ColorPalette) -> [CloudLayer; 3] {
-    [
-        CloudLayer {
-            z: -8.0,
-            count: 4,
-            color: palette.cloud_near,
-            scale_min: 0.42,
-            scale_max: 0.65,
-            x_spread: 4.0,
-            float_amplitude: 0.22,
-            parallax_factor: 0.60,
-        },
-        CloudLayer {
-            z: -12.0,
-            count: 6,
-            color: palette.cloud_mid,
-            scale_min: 0.36,
-            scale_max: 0.56,
-            x_spread: 5.5,
-            float_amplitude: 0.13,
-            parallax_factor: 0.78,
-        },
-        CloudLayer {
-            z: -14.0,
-            count: 8,
-            color: palette.cloud_far,
-            scale_min: 0.28,
-            scale_max: 0.44,
-            x_spread: 6.5,
-            float_amplitude: 0.06,
-            parallax_factor: 0.93,
-        },
-    ]
-}
-
 pub fn spawn_clouds(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -185,4 +137,52 @@ pub fn update_clouds(
         transform.translation.x = cloud.base_x + float_x;
         transform.translation.y = camera_y + wrapped_rel_y;
     }
+}
+
+struct CloudLayer {
+    z: f32,
+    count: u32,
+    color: Color,
+    scale_min: f32,
+    scale_max: f32,
+    x_spread: f32,
+    float_amplitude: f32,
+    // Fracción de camera_y que sigue la capa. 1.0 = pegada a la cámara (sin parallax).
+    // <1.0 → se rezaga: cuanto más bajo, más sube en pantalla cuando la cámara baja.
+    parallax_factor: f32,
+}
+
+fn cloud_layers(palette: &ColorPalette) -> [CloudLayer; 3] {
+    [
+        CloudLayer {
+            z: -8.0,
+            count: 4,
+            color: palette.cloud_near,
+            scale_min: 0.42,
+            scale_max: 0.65,
+            x_spread: 4.0,
+            float_amplitude: 0.22,
+            parallax_factor: 0.60,
+        },
+        CloudLayer {
+            z: -12.0,
+            count: 6,
+            color: palette.cloud_mid,
+            scale_min: 0.36,
+            scale_max: 0.56,
+            x_spread: 5.5,
+            float_amplitude: 0.13,
+            parallax_factor: 0.78,
+        },
+        CloudLayer {
+            z: -14.0,
+            count: 8,
+            color: palette.cloud_far,
+            scale_min: 0.28,
+            scale_max: 0.44,
+            x_spread: 6.5,
+            float_amplitude: 0.06,
+            parallax_factor: 0.93,
+        },
+    ]
 }

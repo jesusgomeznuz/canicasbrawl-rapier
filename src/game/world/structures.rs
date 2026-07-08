@@ -3,14 +3,6 @@ use rapier_bevy::{
     ColliderShape, ObjectDef, SimulationMode, VisualAppearance, VisualDef, spawn_object,
 };
 
-pub fn tinted_white(color: Color) -> VisualDef {
-    VisualDef {
-        appearance: VisualAppearance::Color(color),
-        roughness: 0.85,
-        ..Default::default()
-    }
-}
-
 pub fn spawn_floor(
     commands: &mut Commands,
     mode: &SimulationMode,
@@ -79,5 +71,13 @@ pub fn spawn_wall_segment(
             meshes,
             materials,
         );
+    }
+}
+
+pub fn tinted_white(color: Color) -> VisualDef {
+    VisualDef {
+        appearance: VisualAppearance::Color(color),
+        roughness: 0.85,
+        ..Default::default()
     }
 }

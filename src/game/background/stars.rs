@@ -20,36 +20,6 @@ pub struct StarTwinkle {
     amplitude: f32,  // cuánto varía la opacidad
 }
 
-// Parámetros editables del campo de estrellas — cambia aquí para tunar visualmente.
-// count:      cuántas estrellas  (prueba 40–100)
-// min/max_size: radio en unidades del mundo a Z=-15 (0.040≈2px, 0.090≈4px)
-// base_alpha:   brillo base (0–1)
-// twinkle_amplitude: variación de opacidad (0=sin parpadeo, 0.4=muy notable)
-// twinkle_freq_min/max: rango de velocidad de parpadeo en Hz (0.8–2.0 = natural)
-struct StarConfig {
-    count: u32,
-    min_size: f32,
-    max_size: f32,
-    base_alpha: f32,
-    twinkle_amplitude: f32,
-    twinkle_freq_min: f32,
-    twinkle_freq_max: f32,
-}
-
-impl Default for StarConfig {
-    fn default() -> Self {
-        Self {
-            count: 110,
-            min_size: 0.015,
-            max_size: 0.10,
-            base_alpha: 0.25,
-            twinkle_amplitude: 0.20,
-            twinkle_freq_min: 0.7,
-            twinkle_freq_max: 2.1,
-        }
-    }
-}
-
 pub fn spawn_stars(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -134,6 +104,36 @@ pub fn twinkle_stars(
         let alpha = twinkle.base_alpha
             + twinkle.amplitude * (twinkle.phase + elapsed * twinkle.frequency * std::f32::consts::TAU).sin();
         material.base_color = Color::srgba(1.0, 1.0, 1.0, alpha.clamp(0.0, 1.0));
+    }
+}
+
+// Parámetros editables del campo de estrellas — cambia aquí para tunar visualmente.
+// count:      cuántas estrellas  (prueba 40–100)
+// min/max_size: radio en unidades del mundo a Z=-15 (0.040≈2px, 0.090≈4px)
+// base_alpha:   brillo base (0–1)
+// twinkle_amplitude: variación de opacidad (0=sin parpadeo, 0.4=muy notable)
+// twinkle_freq_min/max: rango de velocidad de parpadeo en Hz (0.8–2.0 = natural)
+struct StarConfig {
+    count: u32,
+    min_size: f32,
+    max_size: f32,
+    base_alpha: f32,
+    twinkle_amplitude: f32,
+    twinkle_freq_min: f32,
+    twinkle_freq_max: f32,
+}
+
+impl Default for StarConfig {
+    fn default() -> Self {
+        Self {
+            count: 110,
+            min_size: 0.015,
+            max_size: 0.10,
+            base_alpha: 0.25,
+            twinkle_amplitude: 0.20,
+            twinkle_freq_min: 0.7,
+            twinkle_freq_max: 2.1,
+        }
     }
 }
 

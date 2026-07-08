@@ -56,7 +56,6 @@ fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorP
                 game::background::sky::spawn_sky,
                 game::background::stars::spawn_stars,
                 game::background::clouds::spawn_clouds,
-                game::hud::spawn_hud,
             ),
         );
 }
@@ -113,7 +112,6 @@ fn on_frame_update(app: &mut App) {
             game::sensors::shrink::manage_shrink_badges,
         ),
     )
-    .add_systems(Update, game::hud::update_hud)
     .add_systems(Update, production::stall_detector::detect_stall);
 }
 

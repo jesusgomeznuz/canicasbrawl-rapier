@@ -14,7 +14,7 @@ use super::pickups::{
 };
 use super::structures::{spawn_floor, spawn_wall_segment, tinted_white};
 use crate::game::race_events::RaceEvent;
-use crate::game::level::{ModuleData, WorldObject, load_module};
+use super::modules::{ModuleData, WorldObject, load_module};
 use crate::game::marbles::Marble;
 
 #[derive(Resource)]
@@ -46,32 +46,9 @@ impl LevelGen {
     }
 }
 
-enum LevelGenerationAction {
-    GenerateModule,
-    SpawnFinishLine,
-    DoNothing,
-}
-
-fn decide_level_action(
-    level_gen: &LevelGen,
-    leader_y: f32,
-    elapsed_secs: f32,
-) -> LevelGenerationAction {
-    if level_gen.finish_spawned {
-        return LevelGenerationAction::DoNothing;
-    }
-
-    let race_time_is_up = elapsed_secs >= level_gen.target_secs;
-    if race_time_is_up {
-        return LevelGenerationAction::SpawnFinishLine;
-    }
-
-    let trigger_distance = 3.0;
-    let leader_is_near_the_horizon = leader_y - level_gen.next_top < trigger_distance;
-    if leader_is_near_the_horizon {
-        return LevelGenerationAction::GenerateModule;
-    }
-    LevelGenerationAction::DoNothing
+#[derive(Component, Clone, Copy)]
+pub struct ModuleSpan {
+    pub bottom: f32,
 }
 
 pub fn generate_level(
@@ -103,18 +80,6 @@ pub fn generate_level(
         }
         LevelGenerationAction::DoNothing => {}
     }
-}
-
-fn module_height(name: &str) -> f32 {
-    let module_gap = 0.1;
-    let ModuleData { objects } = load_module(name);
-    let (y_min, y_max) = objects
-        .iter()
-        .map(|o| o.y_bounds())
-        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), (mn, mx)| {
-            (lo.min(mn), hi.max(mx))
-        });
-    (y_max - y_min) + module_gap
 }
 
 pub fn spawn_level_module(
@@ -188,6 +153,50 @@ pub fn close_level_with_finish(
     crate::game::finish::spawn_finish_line(commands, meshes, materials, asset_server, finish_y);
 }
 
+pub fn disable_modules_above_screen(
+    camera: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
+    modules: Query<(Entity, &ModuleSpan), Without<ColliderDisabled>>,
+    mut commands: Commands,
+) {
+    let Ok((projection, camera_transform)) = camera.single() else {
+        return;
+    };
+    let exit_margin = 0.5;
+    for (entity, span) in &modules {
+        if crate::game::camera::world_y_above_screen(span.bottom, exit_margin, projection, camera_transform) {
+            commands.entity(entity).insert(ColliderDisabled);
+        }
+    }
+}
+
+enum LevelGenerationAction {
+    GenerateModule,
+    SpawnFinishLine,
+    DoNothing,
+}
+
+fn decide_level_action(
+    level_gen: &LevelGen,
+    leader_y: f32,
+    elapsed_secs: f32,
+) -> LevelGenerationAction {
+    if level_gen.finish_spawned {
+        return LevelGenerationAction::DoNothing;
+    }
+
+    let race_time_is_up = elapsed_secs >= level_gen.target_secs;
+    if race_time_is_up {
+        return LevelGenerationAction::SpawnFinishLine;
+    }
+
+    let trigger_distance = 3.0;
+    let leader_is_near_the_horizon = leader_y - level_gen.next_top < trigger_distance;
+    if leader_is_near_the_horizon {
+        return LevelGenerationAction::GenerateModule;
+    }
+    LevelGenerationAction::DoNothing
+}
+
 fn pick_module(level_gen: &mut LevelGen) -> &'static str {
     let pool: &[(&'static str, u32)] = &[
         ("crosses", 5),
@@ -217,29 +226,20 @@ fn pick_module(level_gen: &mut LevelGen) -> &'static str {
     }
 }
 
+fn module_height(name: &str) -> f32 {
+    let module_gap = 0.1;
+    let ModuleData { objects } = load_module(name);
+    let (y_min, y_max) = objects
+        .iter()
+        .map(|o| o.y_bounds())
+        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), (mn, mx)| {
+            (lo.min(mn), hi.max(mx))
+        });
+    (y_max - y_min) + module_gap
+}
+
 fn module_acts_as_gate(name: &str) -> bool {
     matches!(name, "toruses" | "bouncy_walls" | "bars")
-}
-
-#[derive(Component, Clone, Copy)]
-pub struct ModuleSpan {
-    pub bottom: f32,
-}
-
-pub fn disable_modules_above_screen(
-    camera: Query<(&Projection, &GlobalTransform), With<Camera3d>>,
-    modules: Query<(Entity, &ModuleSpan), Without<ColliderDisabled>>,
-    mut commands: Commands,
-) {
-    let Ok((projection, camera_transform)) = camera.single() else {
-        return;
-    };
-    let exit_margin = 0.5;
-    for (entity, span) in &modules {
-        if crate::game::camera::world_y_above_screen(span.bottom, exit_margin, projection, camera_transform) {
-            commands.entity(entity).insert(ColliderDisabled);
-        }
-    }
 }
 
 fn spawn_module(

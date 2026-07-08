@@ -53,6 +53,27 @@ pub fn on_swap_contact(
     }
 }
 
+pub fn fade_swap_rings(
+    time: Res<Time>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    rings: Query<(Entity, &SwapRing)>,
+    mut commands: Commands,
+) {
+    let now = time.elapsed_secs();
+    for (entity, ring) in &rings {
+        let progress = (now - ring.spawned_at) / ring.lifetime;
+        if progress >= 1.0 {
+            commands.entity(entity).despawn();
+            continue;
+        }
+        let alpha = 1.0 - progress;
+        if let Some(material) = materials.get_mut(&ring.material) {
+            material.base_color = material.base_color.with_alpha(alpha);
+            material.emissive = material.emissive * alpha;
+        }
+    }
+}
+
 pub fn spawn_swap_rings(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
@@ -82,27 +103,6 @@ pub fn spawn_swap_rings(
             SwapRing { material, spawned_at: time.elapsed_secs(), lifetime },
         )).id();
         commands.entity(marble).add_child(ring);
-    }
-}
-
-pub fn fade_swap_rings(
-    time: Res<Time>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    rings: Query<(Entity, &SwapRing)>,
-    mut commands: Commands,
-) {
-    let now = time.elapsed_secs();
-    for (entity, ring) in &rings {
-        let progress = (now - ring.spawned_at) / ring.lifetime;
-        if progress >= 1.0 {
-            commands.entity(entity).despawn();
-            continue;
-        }
-        let alpha = 1.0 - progress;
-        if let Some(material) = materials.get_mut(&ring.material) {
-            material.base_color = material.base_color.with_alpha(alpha);
-            material.emissive = material.emissive * alpha;
-        }
     }
 }
 

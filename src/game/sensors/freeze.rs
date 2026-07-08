@@ -7,16 +7,6 @@ use crate::game::race_events::RaceEvent;
 use crate::game::camera::world_pos_on_screen;
 use crate::game::marbles::{Marble, MarbleIndex};
 
-pub fn marble_groups() -> CollisionGroups {
-    let (marble, frozen) = (Group::GROUP_1, Group::GROUP_2);
-    CollisionGroups::new(marble, Group::all().difference(frozen))
-}
-
-pub fn frozen_groups() -> CollisionGroups {
-    let (marble, frozen) = (Group::GROUP_1, Group::GROUP_2);
-    CollisionGroups::new(frozen, Group::all().difference(marble).difference(frozen))
-}
-
 #[derive(Component)]
 pub struct FreezeEffect;
 
@@ -61,27 +51,6 @@ pub fn on_freeze_contact(
             });
         }
     }
-}
-
-pub fn spawn_frozen_visual(
-    commands: &mut Commands,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
-    marble: Entity,
-) -> Entity {
-    let icy = StandardMaterial {
-        base_color: Color::srgba(0.65, 0.88, 1.0, 0.55),
-        emissive: LinearRgba::new(0.2, 0.45, 0.6, 1.0),
-        alpha_mode: AlphaMode::Blend,
-        ..default()
-    };
-    let visual = commands.spawn((
-        Mesh3d(meshes.add(Sphere::new(0.11))),
-        MeshMaterial3d(materials.add(icy)),
-        Transform::from_xyz(0.0, 0.0, 0.12),
-    )).id();
-    commands.entity(marble).add_child(visual);
-    visual
 }
 
 pub fn try_unfreeze(
@@ -138,4 +107,35 @@ pub fn manage_freeze_badges(
         }
         commands.entity(marble_entity).remove::<FreezeTimerMarker>();
     }
+}
+
+pub fn spawn_frozen_visual(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    marble: Entity,
+) -> Entity {
+    let icy = StandardMaterial {
+        base_color: Color::srgba(0.65, 0.88, 1.0, 0.55),
+        emissive: LinearRgba::new(0.2, 0.45, 0.6, 1.0),
+        alpha_mode: AlphaMode::Blend,
+        ..default()
+    };
+    let visual = commands.spawn((
+        Mesh3d(meshes.add(Sphere::new(0.11))),
+        MeshMaterial3d(materials.add(icy)),
+        Transform::from_xyz(0.0, 0.0, 0.12),
+    )).id();
+    commands.entity(marble).add_child(visual);
+    visual
+}
+
+pub fn marble_groups() -> CollisionGroups {
+    let (marble, frozen) = (Group::GROUP_1, Group::GROUP_2);
+    CollisionGroups::new(marble, Group::all().difference(frozen))
+}
+
+pub fn frozen_groups() -> CollisionGroups {
+    let (marble, frozen) = (Group::GROUP_1, Group::GROUP_2);
+    CollisionGroups::new(frozen, Group::all().difference(marble).difference(frozen))
 }

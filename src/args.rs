@@ -57,8 +57,8 @@ fn parse_roster_spec(args: &[String]) -> RosterSpec {
     match (slots, parse_characters(args)) {
         (Some(_), Some(_)) => {
             eprintln!(
-                "--slots y --characters son excluyentes: la física se hornea anónima \
-                       con --slots y se viste con --characters al renderizar la timeline."
+                "--slots y --characters son excluyentes: la timeline se escribe anónima \
+                 con --slots y se viste con --characters al reproducirla (--play)."
             );
             std::process::exit(1);
         }

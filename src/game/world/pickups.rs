@@ -4,10 +4,6 @@ use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rapier_bevy::{BodyType, ColliderShape, ObjectDef, SimulationMode, spawn_object};
 
-fn default_effect_weights() -> &'static [(&'static str, u32)] {
-    &[("freeze", 4), ("swap", 3), ("shrink", 1)]
-}
-
 pub fn resolve_slot_variant<'a>(
     options: &'a [String],
     world_y: f32,
@@ -32,11 +28,6 @@ pub fn resolve_slot_variant<'a>(
             .collect();
         valid.choose(rng).copied()
     }
-}
-
-pub fn should_skip_effect(variant: &str, world_y: f32) -> bool {
-    let swap_block_above_y = -3.0_f32;
-    variant == "swap" && world_y > swap_block_above_y
 }
 
 pub fn spawn_invisible_sensor(
@@ -103,6 +94,15 @@ pub fn spawn_spinning_icon(
         ))
         .id();
     commands.entity(sensor).add_child(icon);
+}
+
+pub fn should_skip_effect(variant: &str, world_y: f32) -> bool {
+    let swap_block_above_y = -3.0_f32;
+    variant == "swap" && world_y > swap_block_above_y
+}
+
+fn default_effect_weights() -> &'static [(&'static str, u32)] {
+    &[("freeze", 4), ("swap", 3), ("shrink", 1)]
 }
 
 fn icon_tuning_for(variant: &str) -> (Vec3, f32, f32) {
