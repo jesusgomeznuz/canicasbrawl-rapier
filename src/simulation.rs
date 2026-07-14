@@ -27,21 +27,25 @@ pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPale
 }
 
 fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorPalette, video_secs: f32) {
-    game::cast_the_race(app, roster);
+    game::prepare_the_race(app, roster);
     game::world::build_the_world(app, seed, finish_target_secs(video_secs));
     game::background::paint_the_backdrop(app, palette);
-    production::setup_production(app);
+    production::initialize_voice_tracker(app);
 }
 
-// El loop central: todo lo que se repite, agrupado por semántica. Cada acto
-// declara su ritmo adentro con el vocabulario de Bevy (FixedUpdate = la verdad
-// de la carrera, Update = lo que se anima, PostUpdate = los que persiguen
-// posiciones ya firmes).
+// El loop central: todo lo que se repite, agrupado por semántica y ordenado
+// como se cuenta la carrera. Cada acto declara su ritmo adentro con el
+// vocabulario de Bevy (FixedUpdate = la verdad de la carrera, Update = lo que
+// se anima, PostUpdate = los que persiguen posiciones ya firmes). La banda de
+// eventos es estructura del engine: el juego solo pone su escenografía.
 fn on_update(app: &mut App) {
-    game::track_the_leader(app);
-    game::race_events::run_the_event_band(app);
-    game::sensors::run_the_sensors(app);
     game::world::generate_the_level(app);
+    game::sensors::run_the_sensors(app);
+    rapier_bevy::run_the_event_band::<game::race_events::RaceEvent, _>(
+        app,
+        game::staging::stage_race_events,
+    );
+    game::track_the_leader(app);
     game::background::animate_the_backdrop(app);
     game::labels::follow_the_marbles(app);
 }

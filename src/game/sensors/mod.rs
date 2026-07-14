@@ -25,7 +25,7 @@ pub fn run_the_sensors(app: &mut App) {
             bouncy::trigger_bouncy_pulse,
         )
             .after(PhysicsSet::Writeback)
-            .before(crate::game::race_events::emit_race_events_from_timeline),
+            .before(rapier_bevy::EventBand),
     );
     app.add_systems(
         FixedUpdate,

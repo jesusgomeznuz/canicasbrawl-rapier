@@ -15,8 +15,9 @@ pub mod roster;
 pub mod sensors;
 pub mod world;
 
-/// Quiénes juegan y el estado de la carrera: elenco, líder, meta y resultado.
-pub fn cast_the_race(app: &mut App, marbles: Vec<roster::MarbleConfig>) {
+/// Se prepara la carrera: el elenco (quiénes juegan) y el marcador
+/// (líder, meta y resultado, aún vacíos).
+pub fn prepare_the_race(app: &mut App, marbles: Vec<roster::MarbleConfig>) {
     app.insert_resource(finish::RaceResult::default())
         .insert_resource(finish::FinishLineY::default())
         .insert_resource(leader::RaceLeader::default())

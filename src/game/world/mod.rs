@@ -37,6 +37,6 @@ pub fn generate_the_level(app: &mut App) {
             level_generation::disable_modules_above_screen,
         )
             .after(PhysicsSet::Writeback)
-            .before(crate::game::race_events::emit_race_events_from_timeline),
+            .before(rapier_bevy::EventBand),
     );
 }

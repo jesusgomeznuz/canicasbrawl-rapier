@@ -7,15 +7,12 @@
 //!
 //! Este enum es la aduana de la pista de eventos: escribir (`payload`) y leer
 //! (`parse`) viven juntos — una sola fuente de verdad del formato del sobre.
-//!
-//! También circula como evento vivo de Bevy: los contactos reales lo emiten en
-//! física y `emit_race_events_from_timeline` lo re-emite en play — la
-//! escenografía (staging.rs) lo consume igual en ambos mundos, y
-//! `send_race_events_to_timeline` lo escribe a la partitura en --write-timeline
-//! sin que ningún sensor arme strings a mano.
+//! La BANDA que lo transporta (actuación → buzón → escenografía) es estructura
+//! y vive en el engine (`rapier_bevy::run_the_event_band`); aquí solo queda el
+//! vocabulario, y la escenografía que lo consume vive en staging.rs.
 
 use bevy::prelude::*;
-use rapier_bevy::{PlayEvent, TimelineEvents};
+use rapier_bevy::TimelineVocabulary;
 
 #[derive(Event, Clone)]
 pub enum RaceEvent {
@@ -27,8 +24,8 @@ pub enum RaceEvent {
     Finish { top: f32 },
 }
 
-impl RaceEvent {
-    pub fn payload(&self) -> String {
+impl TimelineVocabulary for RaceEvent {
+    fn payload(&self) -> String {
         match self {
             RaceEvent::Freeze { marble, x, y, duration } => {
                 format!("freeze {marble} {x:.3} {y:.3} {duration}")
@@ -45,13 +42,7 @@ impl RaceEvent {
         }
     }
 
-    pub fn parse(payload: &str) -> RaceEvent {
-        RaceEvent::try_parse(payload).unwrap_or_else(|| {
-            panic!("evento de carrera ilegible: '{payload}' — write-timeline y play hablan idiomas distintos")
-        })
-    }
-
-    fn try_parse(payload: &str) -> Option<RaceEvent> {
+    fn parse(payload: &str) -> Option<RaceEvent> {
         let parts: Vec<&str> = payload.split_whitespace().collect();
         match parts.as_slice() {
             ["freeze", marble, x, y, duration] => Some(RaceEvent::Freeze {
@@ -86,40 +77,4 @@ impl RaceEvent {
             _ => None,
         }
     }
-}
-
-pub fn send_race_events_to_timeline(
-    mut events: EventReader<RaceEvent>,
-    mut timeline: Option<ResMut<TimelineEvents>>,
-) {
-    let Some(timeline) = timeline.as_deref_mut() else { return };
-    for event in events.read() {
-        timeline.0.push(event.payload());
-    }
-}
-
-pub fn emit_race_events_from_timeline(
-    mut wire: EventReader<PlayEvent>,
-    mut events: EventWriter<RaceEvent>,
-) {
-    for PlayEvent(payload) in wire.read() {
-        events.write(RaceEvent::parse(payload));
-    }
-}
-
-/// La banda de eventos — igual en todos los mundos: la actuación re-emite, la
-/// física escribe, la escenografía monta. Encadenada en el mismo tick.
-pub fn run_the_event_band(app: &mut App) {
-    app.add_event::<RaceEvent>();
-    app.add_event::<PlayEvent>();
-    app.add_systems(
-        FixedUpdate,
-        (
-            emit_race_events_from_timeline,
-            send_race_events_to_timeline,
-            super::staging::stage_race_events,
-        )
-            .chain()
-            .after(bevy_rapier3d::plugin::PhysicsSet::Writeback),
-    );
 }
