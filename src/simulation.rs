@@ -36,10 +36,7 @@ fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorP
     game::cast_the_race(app, roster);
     game::world::build_the_world(app, seed, finish_target_secs());
     game::background::paint_the_backdrop(app, palette);
-    app.add_systems(
-        Startup,
-        (game::camera::spawn_camera_and_lights, game::leader::spawn_crown),
-    );
+    app.add_systems(Startup, game::leader::spawn_crown);
     production::setup_production(app);
 }
 
@@ -47,10 +44,6 @@ fn on_step(app: &mut App) {
     game::track_the_leader(app);
     game::race_events::run_the_event_band(app);
     game::sensors::tick_the_sensors(app);
-    app.add_systems(
-        FixedUpdate,
-        game::camera::camera_follows_lowest_marble.after(PhysicsSet::Writeback),
-    );
 
     if timeline_path().is_none() {
         react_to_real_collisions(app);

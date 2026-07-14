@@ -22,7 +22,8 @@ pub fn cast_the_race(app: &mut App, marbles: Vec<roster::MarbleConfig>) {
         .insert_resource(roster::Roster(marbles));
 }
 
-/// La cadena de liderazgo: quién cruzó la meta, quién va ganando, quién canta.
+/// La cadena de liderazgo: quién cruzó la meta, quién va ganando, quién canta —
+/// y la cámara que lo sigue (aquí ya no se coloca: se actualiza).
 pub fn track_the_leader(app: &mut App) {
     app.add_systems(
         FixedUpdate,
@@ -33,5 +34,9 @@ pub fn track_the_leader(app: &mut App) {
         )
             .chain()
             .after(PhysicsSet::Writeback),
+    );
+    app.add_systems(
+        FixedUpdate,
+        camera::camera_follows_lowest_marble.after(PhysicsSet::Writeback),
     );
 }
