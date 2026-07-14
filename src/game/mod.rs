@@ -23,12 +23,11 @@ pub fn cast_the_race(app: &mut App, marbles: Vec<roster::MarbleConfig>) {
         .insert_resource(roster::Roster(marbles));
 }
 
-/// El acto completo del liderazgo, con su utilería: quién cruzó la meta, quién
-/// va ganando, quién canta (la verdad, a paso de física), la cámara que lo
-/// sigue, y la corona — que nace aquí y se pega al líder cuando todas las
-/// posiciones del frame ya quedaron firmes.
+/// El acto completo del liderazgo: quién cruzó la meta, quién va ganando,
+/// quién canta (la verdad, a paso de física), la cámara que lo sigue, y la
+/// corona que se pega al líder cuando las posiciones del frame ya quedaron
+/// firmes (la corona se COLOCA en build_the_world, como la cámara).
 pub fn track_the_leader(app: &mut App) {
-    app.add_systems(Startup, leader::spawn_crown);
     app.add_systems(
         FixedUpdate,
         (
