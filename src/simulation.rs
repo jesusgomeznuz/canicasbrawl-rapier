@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy_rapier3d::plugin::PhysicsSet;
 use rapier_bevy::{
-    GameAppConfig, PlayEvent, SimulationMode, random_physics_game_app,
+    GameAppConfig, SimulationMode, random_physics_game_app,
     record_duration, timeline_path, write_timeline_duration,
 };
 
@@ -33,66 +33,23 @@ pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPale
 }
 
 fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorPalette) {
-    let clear = palette.clear_color();
-    app.insert_resource(ClearColor(clear))
-        .insert_resource(palette)
-        .insert_resource(production::voice_tracker::VoiceTracker::default())
-        .insert_resource(production::stall_detector::StallDetector::default())
-        .insert_resource(game::finish::RaceResult::default())
-        .insert_resource(game::finish::FinishLineY::default())
-        .insert_resource(game::leader::RaceLeader::default())
-        .insert_resource(game::roster::Roster(roster))
-        .insert_resource(game::world::level_generation::LevelSeed(seed))
-        .insert_resource(game::world::level_generation::FinishTarget(
-            finish_target_secs(),
-        ))
-        .add_systems(
-            Startup,
-            (
-                game::camera::spawn_camera_and_lights,
-                game::leader::spawn_crown,
-                game::world::setup::setup,
-                game::world::setup::set_gravity,
-                game::background::sky::spawn_sky,
-                game::background::stars::spawn_stars,
-                game::background::clouds::spawn_clouds,
-            ),
-        );
+    game::cast_the_race(app, roster);
+    game::world::build_the_world(app, seed, finish_target_secs());
+    game::background::paint_the_backdrop(app, palette);
+    app.add_systems(
+        Startup,
+        (game::camera::spawn_camera_and_lights, game::leader::spawn_crown),
+    );
+    production::setup_production(app);
 }
 
 fn on_step(app: &mut App) {
-    app.add_event::<game::race_events::RaceEvent>();
-    app.add_event::<PlayEvent>();
+    game::track_the_leader(app);
+    game::race_events::run_the_event_band(app);
+    game::sensors::tick_the_sensors(app);
     app.add_systems(
         FixedUpdate,
-        (
-            (
-                game::finish::check_finish_crossing,
-                game::leader::update_race_leader,
-                production::voice_tracker::track_race_leader,
-            )
-                .chain(),
-            (
-                game::race_events::emit_race_events_from_timeline,
-                game::race_events::send_race_events_to_timeline,
-                game::staging::stage_race_events,
-            )
-                .chain(),
-        )
-            .after(PhysicsSet::Writeback),
-    )
-    .add_systems(
-        FixedUpdate,
-        (
-            game::sensors::freeze::try_unfreeze,
-            game::sensors::shrink::try_unshrink,
-            game::sensors::swap::fade_swap_rings,
-            game::sensors::icons::spin_icons,
-            game::sensors::bouncy::animate_bounce_pulse,
-            game::sensors::bouncy::tick_bounce_cooldown,
-            game::camera::camera_follows_lowest_marble,
-        )
-            .after(PhysicsSet::Writeback),
+        game::camera::camera_follows_lowest_marble.after(PhysicsSet::Writeback),
     );
 
     if timeline_path().is_none() {
@@ -101,18 +58,9 @@ fn on_step(app: &mut App) {
 }
 
 fn on_frame_update(app: &mut App) {
-    app.add_systems(
-        Update,
-        (
-            game::background::sky::update_sky_with_camera,
-            game::background::stars::stars_follow_camera,
-            game::background::stars::twinkle_stars,
-            game::background::clouds::update_clouds,
-            game::sensors::freeze::manage_freeze_badges,
-            game::sensors::shrink::manage_shrink_badges,
-        ),
-    )
-    .add_systems(Update, production::stall_detector::detect_stall);
+    game::background::animate_the_backdrop(app);
+    game::sensors::show_the_badges(app);
+    app.add_systems(Update, production::stall_detector::detect_stall);
 }
 
 fn after_frame_update(app: &mut App) {

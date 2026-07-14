@@ -106,3 +106,20 @@ pub fn emit_race_events_from_timeline(
         events.write(RaceEvent::parse(payload));
     }
 }
+
+/// La banda de eventos — igual en todos los mundos: la actuación re-emite, la
+/// física escribe, la escenografía monta. Encadenada en el mismo tick.
+pub fn run_the_event_band(app: &mut App) {
+    app.add_event::<RaceEvent>();
+    app.add_event::<PlayEvent>();
+    app.add_systems(
+        FixedUpdate,
+        (
+            emit_race_events_from_timeline,
+            send_race_events_to_timeline,
+            super::staging::stage_race_events,
+        )
+            .chain()
+            .after(bevy_rapier3d::plugin::PhysicsSet::Writeback),
+    );
+}
