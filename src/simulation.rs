@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy::transform::TransformSystem;
 use rapier_bevy::{GameAppConfig, SimulationMode, random_physics_game_app};
 
 use crate::args::RosterSpec;
@@ -21,9 +20,7 @@ pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPale
         },
     );
     on_start(&mut app, seed, roster, palette, video_secs);
-    on_step(&mut app);
-    on_frame_update(&mut app);
-    after_frame_update(&mut app);
+    on_update(&mut app);
     on_exit(&mut app);
 
     app.run();
@@ -33,33 +30,20 @@ fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorP
     game::cast_the_race(app, roster);
     game::world::build_the_world(app, seed, finish_target_secs(video_secs));
     game::background::paint_the_backdrop(app, palette);
-    app.add_systems(Startup, game::leader::spawn_crown);
     production::setup_production(app);
 }
 
-fn on_step(app: &mut App) {
+// El loop central: todo lo que se repite, agrupado por semántica. Cada acto
+// declara su ritmo adentro con el vocabulario de Bevy (FixedUpdate = la verdad
+// de la carrera, Update = lo que se anima, PostUpdate = los que persiguen
+// posiciones ya firmes).
+fn on_update(app: &mut App) {
     game::track_the_leader(app);
     game::race_events::run_the_event_band(app);
     game::sensors::run_the_sensors(app);
     game::world::generate_the_level(app);
-}
-
-fn on_frame_update(app: &mut App) {
     game::background::animate_the_backdrop(app);
-    game::sensors::show_the_badges(app);
-    app.add_systems(Update, production::stall_detector::detect_stall);
-}
-
-fn after_frame_update(app: &mut App) {
-    app.add_systems(
-        PostUpdate,
-        (
-            game::labels::update_marble_labels,
-            game::leader::crown_follows_leader,
-            game::sensors::badges::update_badges,
-        )
-            .after(TransformSystem::TransformPropagate),
-    );
+    game::labels::follow_the_marbles(app);
 }
 
 fn on_exit(app: &mut App) {

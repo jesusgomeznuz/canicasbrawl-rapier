@@ -1,6 +1,16 @@
 use bevy::prelude::*;
+use bevy::transform::TransformSystem;
 
 use super::marbles::Marble;
+
+/// Las etiquetas de nombre persiguen a su canica: proyectan mundo→pantalla
+/// cuando todas las posiciones del frame ya quedaron firmes.
+pub fn follow_the_marbles(app: &mut App) {
+    app.add_systems(
+        PostUpdate,
+        update_marble_labels.after(TransformSystem::TransformPropagate),
+    );
+}
 
 #[derive(Component)]
 pub struct MarbleLabel(pub Entity);
