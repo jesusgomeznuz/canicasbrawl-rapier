@@ -12,7 +12,9 @@ pub const UNIT: f32 = 0.35;
 
 fn main() {
     match args::parse_command() {
-        Command::Simulation(mode, seed, roster, palette) => simulation::run(mode, seed, roster, palette),
+        Command::Simulation(mode, seed, roster, palette, video_secs) => {
+            simulation::run(mode, seed, roster, palette, video_secs)
+        }
         Command::BuildModules => process_modules::run(),
         Command::PreprocessConcaveColliders => preprocess_concave_colliders(),
     }

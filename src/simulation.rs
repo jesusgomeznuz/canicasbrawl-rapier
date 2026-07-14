@@ -1,10 +1,7 @@
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy_rapier3d::plugin::PhysicsSet;
-use rapier_bevy::{
-    GameAppConfig, SimulationMode, random_physics_game_app,
-    record_duration, timeline_path, write_timeline_duration,
-};
+use rapier_bevy::{GameAppConfig, RealCollisions, SimulationMode, random_physics_game_app};
 
 use crate::args::RosterSpec;
 use crate::game;
@@ -12,7 +9,7 @@ use crate::game::background::palette::ColorPalette;
 use crate::game::roster::MarbleConfig;
 use crate::production;
 
-pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPalette) {
+pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPalette, video_secs: f32) {
     let roster = resolve_roster(spec);
     println!("Level seed: {}", seed);
 
@@ -23,7 +20,7 @@ pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPale
             resolution: (540.0, 960.0),
         },
     );
-    on_start(&mut app, seed, roster, palette);
+    on_start(&mut app, seed, roster, palette, video_secs);
     on_step(&mut app);
     on_frame_update(&mut app);
     after_frame_update(&mut app);
@@ -32,9 +29,9 @@ pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPale
     app.run();
 }
 
-fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorPalette) {
+fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorPalette, video_secs: f32) {
     game::cast_the_race(app, roster);
-    game::world::build_the_world(app, seed, finish_target_secs());
+    game::world::build_the_world(app, seed, finish_target_secs(video_secs));
     game::background::paint_the_backdrop(app, palette);
     app.add_systems(Startup, game::leader::spawn_crown);
     production::setup_production(app);
@@ -44,10 +41,7 @@ fn on_step(app: &mut App) {
     game::track_the_leader(app);
     game::race_events::run_the_event_band(app);
     game::sensors::tick_the_sensors(app);
-
-    if timeline_path().is_none() {
-        react_to_real_collisions(app);
-    }
+    react_to_real_collisions(app);
 }
 
 fn on_frame_update(app: &mut App) {
@@ -72,6 +66,8 @@ fn on_exit(app: &mut App) {
     app.add_systems(Last, production::voice_tracker::save_voice_tracker_on_exit);
 }
 
+// Etiquetados RealCollisions: el juego declara que nacen de contactos físicos
+// reales; el ENGINE los apaga en --play. Aquí nadie pregunta por modos.
 fn react_to_real_collisions(app: &mut App) {
     app.add_systems(
         FixedUpdate,
@@ -83,6 +79,7 @@ fn react_to_real_collisions(app: &mut App) {
             game::sensors::swap::on_swap_contact,
             game::sensors::bouncy::trigger_bouncy_pulse,
         )
+            .in_set(RealCollisions)
             .after(PhysicsSet::Writeback)
             .before(game::race_events::emit_race_events_from_timeline),
     );
@@ -100,11 +97,7 @@ fn resolve_roster(spec: RosterSpec) -> Vec<MarbleConfig> {
     })
 }
 
-fn finish_target_secs() -> f32 {
-    let video_secs = record_duration()
-        .or_else(write_timeline_duration)
-        .map(|d| d as f32)
-        .unwrap_or(60.0);
+fn finish_target_secs(video_secs: f32) -> f32 {
     let tail_of_falling_marbles_secs = 12.0;
     video_secs - tail_of_falling_marbles_secs
 }
