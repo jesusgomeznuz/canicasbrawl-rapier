@@ -1,10 +1,6 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use rand::Rng;
-use rand::RngCore;
-use rand::SeedableRng;
-use rand::rngs::SmallRng;
-use rapier_bevy::SimulationMode;
+use rapier_bevy::{Dice, SimulationMode};
 
 use super::modules::{ModuleSpan, module_height, spawn_module};
 use super::structures::{spawn_floor, spawn_wall_segment};
@@ -19,7 +15,6 @@ pub struct FinishTarget(pub f32);
 
 #[derive(Resource)]
 pub struct LevelGen {
-    rng: SmallRng,
     next_top: f32,
     last_module: Option<&'static str>,
     modules_spawned: u32,
@@ -28,9 +23,8 @@ pub struct LevelGen {
 }
 
 impl LevelGen {
-    pub fn new(seed: u64, first_module_top: f32, target_secs: f32) -> Self {
+    pub fn new(first_module_top: f32, target_secs: f32) -> Self {
         Self {
-            rng: SmallRng::seed_from_u64(seed),
             next_top: first_module_top,
             last_module: None,
             modules_spawned: 0,
@@ -44,6 +38,7 @@ pub fn generate_level(
     sim_time: Res<Time<Fixed>>,
     marbles: Query<&Transform, With<Marble>>,
     mut level_gen: ResMut<LevelGen>,
+    mut dice: ResMut<Dice>,
     mut events: EventWriter<RaceEvent>,
 ) {
     let Some(leader_y) = marbles.iter().map(|t| t.translation.y).reduce(f32::min) else {
@@ -51,9 +46,9 @@ pub fn generate_level(
     };
     match decide_level_action(&level_gen, leader_y, sim_time.elapsed_secs()) {
         LevelGenerationAction::GenerateModule => {
-            let name = pick_module(&mut level_gen);
+            let name = pick_module(&level_gen, &mut dice);
             let top = level_gen.next_top;
-            let module_seed = level_gen.rng.next_u64();
+            let module_seed = dice.next_u64();
             events.write(RaceEvent::Module {
                 name: name.to_string(),
                 top,
@@ -193,7 +188,7 @@ fn decide_level_action(
     LevelGenerationAction::DoNothing
 }
 
-fn pick_module(level_gen: &mut LevelGen) -> &'static str {
+fn pick_module(level_gen: &LevelGen, dice: &mut Dice) -> &'static str {
     let pool: &[(&'static str, u32)] = &[
         ("crosses", 5),
         ("zigzag", 5),
@@ -213,7 +208,7 @@ fn pick_module(level_gen: &mut LevelGen) -> &'static str {
         .collect();
     let is_first_module = level_gen.modules_spawned == 0;
     loop {
-        let pick = weighted[level_gen.rng.gen_range(0..weighted.len())];
+        let pick = weighted[dice.roll(weighted.len())];
         let repeats_last = Some(pick) == level_gen.last_module;
         let spheres_as_first = is_first_module && pick == "spheres";
         if !repeats_last && !spheres_as_first {

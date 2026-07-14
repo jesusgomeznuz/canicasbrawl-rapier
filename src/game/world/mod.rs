@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_rapier3d::plugin::PhysicsSet;
 
 pub mod level_generation;
 pub mod modules;
@@ -19,4 +20,21 @@ pub fn build_the_world(app: &mut App, seed: u64, finish_target_secs: f32) {
                 super::camera::spawn_camera_and_lights,
             ),
         );
+}
+
+/// El director trabaja durante la carrera: tira los dados del engine para
+/// decidir el siguiente módulo y apaga colisionadores que ya salieron de
+/// pantalla. Declara `ResMut<Dice>`: donde no hay dados en la mesa (la suerte
+/// ya está escrita en la partitura) se duerme solo, y los módulos llegan como
+/// eventos a la escenografía.
+pub fn generate_the_level(app: &mut App) {
+    app.add_systems(
+        FixedUpdate,
+        (
+            level_generation::generate_level,
+            level_generation::disable_modules_above_screen,
+        )
+            .after(PhysicsSet::Writeback)
+            .before(crate::game::race_events::emit_race_events_from_timeline),
+    );
 }

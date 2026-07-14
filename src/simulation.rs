@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
-use bevy_rapier3d::plugin::PhysicsSet;
-use rapier_bevy::{GameAppConfig, RealCollisions, SimulationMode, random_physics_game_app};
+use rapier_bevy::{GameAppConfig, SimulationMode, random_physics_game_app};
 
 use crate::args::RosterSpec;
 use crate::game;
@@ -18,6 +17,7 @@ pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPale
         GameAppConfig {
             title: "CanicasBrawl",
             resolution: (540.0, 960.0),
+            seed,
         },
     );
     on_start(&mut app, seed, roster, palette, video_secs);
@@ -40,8 +40,8 @@ fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorP
 fn on_step(app: &mut App) {
     game::track_the_leader(app);
     game::race_events::run_the_event_band(app);
-    game::sensors::tick_the_sensors(app);
-    react_to_real_collisions(app);
+    game::sensors::run_the_sensors(app);
+    game::world::generate_the_level(app);
 }
 
 fn on_frame_update(app: &mut App) {
@@ -64,25 +64,6 @@ fn after_frame_update(app: &mut App) {
 
 fn on_exit(app: &mut App) {
     app.add_systems(Last, production::voice_tracker::save_voice_tracker_on_exit);
-}
-
-// Etiquetados RealCollisions: el juego declara que nacen de contactos físicos
-// reales; el ENGINE los apaga en --play. Aquí nadie pregunta por modos.
-fn react_to_real_collisions(app: &mut App) {
-    app.add_systems(
-        FixedUpdate,
-        (
-            game::world::level_generation::generate_level,
-            game::world::level_generation::disable_modules_above_screen,
-            game::sensors::freeze::on_freeze_contact,
-            game::sensors::shrink::on_shrink_contact,
-            game::sensors::swap::on_swap_contact,
-            game::sensors::bouncy::trigger_bouncy_pulse,
-        )
-            .in_set(RealCollisions)
-            .after(PhysicsSet::Writeback)
-            .before(game::race_events::emit_race_events_from_timeline),
-    );
 }
 
 fn resolve_roster(spec: RosterSpec) -> Vec<MarbleConfig> {
