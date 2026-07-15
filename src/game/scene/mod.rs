@@ -5,7 +5,7 @@ pub mod camera;
 
 /// Se prepara todo lo visual: la semilla del telón, la paleta, y el cielo,
 /// las estrellas y las nubes en su lugar. (La cámara se COLOCA en
-/// build_the_world — también es una entidad del mundo.)
+/// build_world — también es una entidad del mundo.)
 pub fn prepare_the_scene(app: &mut App, palette: background::palette::ColorPalette, seed: u64) {
     app.insert_resource(background::BackdropSeed(seed))
         .insert_resource(ClearColor(palette.clear_color()))

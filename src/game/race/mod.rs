@@ -24,7 +24,7 @@ pub fn prepare_the_race(app: &mut App, marbles: Vec<roster::MarbleConfig>, finis
 /// El acto completo del liderazgo: quién cruzó la meta, quién va ganando,
 /// quién canta (la verdad, a paso de física), la cámara que lo sigue, y la
 /// corona que se pega al líder cuando las posiciones del frame ya quedaron
-/// firmes (la corona se COLOCA en build_the_world, como la cámara).
+/// firmes (la corona se COLOCA en build_world, como la cámara).
 /// Solo se sigue a UNO: al líder — las canicas compiten por serlo.
 pub fn follow_the_leader(app: &mut App) {
     app.add_systems(

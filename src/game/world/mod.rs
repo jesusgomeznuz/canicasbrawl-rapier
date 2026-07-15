@@ -16,7 +16,7 @@ pub use sensors::update_sensors;
 /// las canicas (el mundo le pone cuerpo al elenco), y la cámara y la corona,
 /// que también son entidades que se colocan en el mundo (actualizarlas ya es
 /// oficio de follow_the_leader). Cero pizarras: construir significa construir.
-pub fn build_the_world(app: &mut App) {
+pub fn build_world(app: &mut App) {
     app.add_systems(
         Startup,
         (
@@ -30,12 +30,11 @@ pub fn build_the_world(app: &mut App) {
     );
 }
 
-/// El director trabaja durante la carrera: tira los dados del engine para
-/// decidir el siguiente módulo y apaga colisionadores que ya salieron de
-/// pantalla. Declara `ResMut<Dice>`: donde no hay dados en la mesa (la suerte
-/// ya está escrita en la partitura) se duerme solo, y los módulos llegan como
-/// eventos a la escenografía.
-pub fn spawn_next_module(app: &mut App) {
+/// El mundo se mantiene: el director tira los dados para el siguiente módulo
+/// y se apagan los colisionadores que ya salieron de pantalla. Declara
+/// `ResMut<Dice>`: donde no hay dados en la mesa (la suerte ya está escrita
+/// en la partitura) se duerme solo, y los módulos llegan como eventos.
+pub fn update_world(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (

@@ -33,7 +33,7 @@ pub fn run(seed: u64, spec: RosterSpec, palette: ColorPalette, video_secs: f32) 
 
 fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorPalette, video_secs: f32) {
     game::race::prepare_the_race(app, roster, finish_target_secs(video_secs));
-    game::world::build_the_world(app);
+    game::world::build_world(app);
     game::scene::prepare_the_scene(app, palette, seed);
 }
 
@@ -42,13 +42,10 @@ fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorP
 // vocabulario de Bevy (FixedUpdate = la verdad de la carrera, Update = lo que
 // se anima, PostUpdate = los que persiguen posiciones ya firmes).
 fn on_update(app: &mut App) {
-    // EL MUNDO trabaja
-    game::world::spawn_next_module(app);
+    game::world::update_world(app);
     game::world::update_sensors(app);
-    // LA CARRERA se mide
-    game::race::follow_the_leader(app);
-    // LA ESCENA respira
     game::scene::update_scene(app);
+    game::race::follow_the_leader(app);
 }
 
 fn on_exit(app: &mut App) {
