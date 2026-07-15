@@ -1,6 +1,6 @@
 use rapier_bevy::session_duration_secs;
 
-use crate::game::background::palette::ColorPalette;
+use crate::game::scene::background::palette::ColorPalette;
 
 pub enum Command {
     Simulation(u64, RosterSpec, ColorPalette, f32),

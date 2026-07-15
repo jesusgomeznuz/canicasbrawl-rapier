@@ -3,7 +3,7 @@ use bevy::render::mesh::{Indices, PrimitiveTopology};
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy::sprite::ColorMaterial;
 
-use crate::game::marbles::Marble;
+use crate::game::world::marbles::Marble;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum EffectKind {

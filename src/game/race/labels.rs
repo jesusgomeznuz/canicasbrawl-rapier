@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 
-use super::marbles::Marble;
+use crate::game::world::marbles::Marble;
 
 /// Las etiquetas de nombre persiguen a su canica: proyectan mundo→pantalla
 /// cuando todas las posiciones del frame ya quedaron firmes.

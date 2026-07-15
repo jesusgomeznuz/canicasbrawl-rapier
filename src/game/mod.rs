@@ -1,50 +1,10 @@
-use bevy::prelude::*;
-use bevy::transform::TransformSystem;
-use bevy_rapier3d::plugin::PhysicsSet;
+//! Los directores del juego — la responsabilidad vive en la estructura:
+//!   race/  LA CARRERA: quiénes corren y quién gana (elenco, juez, reglas)
+//!   world/ EL MUNDO: la realidad interactuable (pista, trampas, cuerpos)
+//!   scene/ LA ESCENA: lo que se ve sin tocarse (telón, encuadre)
+//! race_events.rs es la aduana — vocabulario transversal, de nadie y de todos.
 
-pub mod background;
+pub mod race;
 pub mod race_events;
-pub mod camera;
-pub mod faces;
-pub mod finish;
-pub mod labels;
-pub mod leader;
-pub mod marbles;
-pub mod staging;
-pub mod roster;
-pub mod sensors;
+pub mod scene;
 pub mod world;
-
-/// Se prepara la carrera: el elenco (quiénes juegan) y el marcador
-/// (líder, meta y resultado, aún vacíos).
-pub fn prepare_the_race(app: &mut App, marbles: Vec<roster::MarbleConfig>) {
-    app.insert_resource(finish::RaceResult::default())
-        .insert_resource(finish::FinishLineY::default())
-        .insert_resource(leader::RaceLeader::default())
-        .insert_resource(roster::Roster(marbles));
-}
-
-/// El acto completo del liderazgo: quién cruzó la meta, quién va ganando,
-/// quién canta (la verdad, a paso de física), la cámara que lo sigue, y la
-/// corona que se pega al líder cuando las posiciones del frame ya quedaron
-/// firmes (la corona se COLOCA en build_the_world, como la cámara).
-pub fn track_the_leader(app: &mut App) {
-    app.add_systems(
-        FixedUpdate,
-        (
-            finish::check_finish_crossing,
-            leader::update_race_leader,
-            crate::production::voice_tracker::track_race_leader,
-        )
-            .chain()
-            .after(PhysicsSet::Writeback),
-    );
-    app.add_systems(
-        FixedUpdate,
-        camera::camera_follows_lowest_marble.after(PhysicsSet::Writeback),
-    );
-    app.add_systems(
-        PostUpdate,
-        leader::crown_follows_leader.after(TransformSystem::TransformPropagate),
-    );
-}

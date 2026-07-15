@@ -3,9 +3,9 @@ use rapier_bevy::{
     AssetsLoading, BodyType, ColliderShape, LockedAxes, ObjectDef, TimelineKey, spawn_object,
 };
 
-use super::faces::{attach_marble_face, dominant_color_from_png};
-use super::labels::spawn_marble_label;
-use super::roster::MarbleConfig;
+use crate::game::race::faces::{attach_marble_face, dominant_color_from_png};
+use crate::game::race::labels::spawn_marble_label;
+use crate::game::race::roster::MarbleConfig;
 
 #[derive(Component)]
 pub struct Marble;

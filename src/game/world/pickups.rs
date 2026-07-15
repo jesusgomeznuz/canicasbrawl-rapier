@@ -64,13 +64,13 @@ pub fn spawn_invisible_sensor(
 pub fn attach_effect_marker(commands: &mut Commands, sensor: Entity, variant: &str) {
     match variant {
         "freeze" => {
-            commands.entity(sensor).insert(crate::game::sensors::freeze::FreezeEffect);
+            commands.entity(sensor).insert(crate::game::world::sensors::freeze::FreezeEffect);
         }
         "shrink" => {
-            commands.entity(sensor).insert(crate::game::sensors::shrink::ShrinkEffect);
+            commands.entity(sensor).insert(crate::game::world::sensors::shrink::ShrinkEffect);
         }
         "swap" => {
-            commands.entity(sensor).insert(crate::game::sensors::swap::SwapEffect);
+            commands.entity(sensor).insert(crate::game::world::sensors::swap::SwapEffect);
         }
         other => panic!("Variante de effect desconocida: '{}'", other),
     }
@@ -88,7 +88,7 @@ pub fn spawn_spinning_icon(
         .spawn((
             SceneRoot(scene),
             Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::splat(scale)),
-            crate::game::sensors::icons::SpinningIcon { axis, speed },
+            crate::game::world::sensors::icons::SpinningIcon { axis, speed },
         ))
         .id();
     commands.entity(sensor).add_child(icon);

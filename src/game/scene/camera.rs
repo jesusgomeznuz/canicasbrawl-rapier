@@ -1,4 +1,4 @@
-use super::marbles::Marble;
+use crate::game::world::marbles::Marble;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::prelude::*;
 use bevy::render::camera::RenderTarget;

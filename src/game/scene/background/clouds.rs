@@ -4,7 +4,7 @@ use rand::SeedableRng;
 use rand::rngs::SmallRng;
 
 use super::palette::ColorPalette;
-use crate::game::world::level_generation::LevelSeed;
+use super::BackdropSeed;
 
 #[derive(Component)]
 pub struct BackgroundCloud {
@@ -23,7 +23,7 @@ pub fn spawn_clouds(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    seed: Res<LevelSeed>,
+    seed: Res<BackdropSeed>,
     palette: Res<ColorPalette>,
 ) {
     let blob_mesh = meshes.add(Sphere::new(0.5));

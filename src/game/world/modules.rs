@@ -152,7 +152,7 @@ pub fn spawn_module(
                 if *bouncy {
                     commands.entity(entity).insert((
                         ActiveEvents::COLLISION_EVENTS,
-                        crate::game::sensors::bouncy::BouncyOnContact,
+                        crate::game::world::sensors::bouncy::BouncyOnContact,
                     ));
                 }
             }
@@ -184,7 +184,7 @@ pub fn spawn_module(
                 if *bouncy {
                     commands.entity(entity).insert((
                         ActiveEvents::COLLISION_EVENTS,
-                        crate::game::sensors::bouncy::BouncyOnContact,
+                        crate::game::world::sensors::bouncy::BouncyOnContact,
                     ));
                 }
             }

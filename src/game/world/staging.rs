@@ -1,13 +1,13 @@
 use bevy::prelude::*;
 
-use super::background::palette::ColorPalette;
-use super::race_events::RaceEvent;
+use crate::game::scene::background::palette::ColorPalette;
+use crate::game::race_events::RaceEvent;
 use super::marbles::{Marble, MarbleIndex};
 use super::sensors::bouncy::{BounceCooldown, BouncePulse, BouncyOnContact};
 use super::sensors::freeze::{FreezeEffect, Frozen, spawn_frozen_visual};
 use super::sensors::shrink::{ShrinkEffect, Shrunk};
 use super::sensors::swap::{SwapEffect, spawn_swap_rings};
-use super::world::level_generation::{close_level_with_finish, spawn_level_module};
+use super::level_generation::{close_level_with_finish, spawn_level_module};
 
 /// La escenografía del juego — única para ambos mundos. Consume RaceEvents
 /// (emitidos por los contactos reales en física, o re-emitidos desde la

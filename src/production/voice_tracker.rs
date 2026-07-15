@@ -1,7 +1,7 @@
 use bevy::app::AppExit;
 use bevy::prelude::*;
-use crate::game::leader::RaceLeader;
-use crate::game::marbles::{Marble, MarbleName};
+use crate::game::race::leader::RaceLeader;
+use crate::game::world::marbles::{Marble, MarbleName};
 use serde::Serialize;
 use std::fs;
 

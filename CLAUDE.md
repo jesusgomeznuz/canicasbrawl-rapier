@@ -67,25 +67,27 @@ src/
     mod.rs             run + transform — el flowchart, con las aduanas RawModule/WorldObject
     shapes.rs          un from_raw por forma + parseo de tags del nombre
     torus_assets.rs    fábrica de .obj/.compound del torus
-  game/
+  game/                LOS DIRECTORES — la responsabilidad vive en la estructura
     race_events.rs     ADUANA de eventos: enum RaceEvent con derive de serde
-                       (ida y vuelta derivadas — la banda vive en el engine)
-    staging.rs         escenografía única de ambos mundos (consume RaceEvent)
-    marbles.rs         la canica: componentes, ensamblador, cuerpo, mesh
-    labels.rs          etiquetas de nombre: spawn + seguimiento en pantalla
-    faces.rs           la cara: disco + PNG del personaje + color dominante
-    roster.rs          casting: quién corre (build_roster / slots_roster)
-    camera.rs          cámara, luces y checks de encuadre
-    finish.rs          meta y orden de llegada
-    leader.rs          quién va ganando + su corona
-    world/
-      level_generation.rs  el director: decide cuándo, cuál y dónde (LevelGen, pick_module)
-      modules.rs           el constructor: qué ES un módulo — aduana del JSON + spawn_module
+                       (transversal — la banda que lo transporta vive en el engine)
+    world/             EL MUNDO: la realidad interactuable
+      level_generation.rs  el director de pista: cuándo, cuál y dónde (LevelGen)
+      modules.rs           qué ES un módulo — aduana del JSON + spawn_module
+      marbles.rs           el cuerpo de la canica: ensamblador, mesh
+      staging.rs           escenografía única de ambos mundos (consume RaceEvent)
+      sensors/             trampas: freeze, shrink, swap, bouncy + badges e icons
       pickups.rs           qué efecto cae en cada slot
       setup.rs / structures.rs  arranque del escenario; suelo y paredes
-    sensors/           freeze, shrink, swap, bouncy + badges e icons compartidos
-    background/        palette, sky, stars, clouds
-  production/
+    race/              LA CARRERA: quiénes corren y quién gana
+      roster.rs            casting: quién corre (build_roster / slots_roster)
+      faces.rs             la cara: disco + PNG del personaje + color dominante
+      labels.rs            etiquetas de nombre: spawn + persecución en pantalla
+      finish.rs            meta, orden de llegada y FinishTarget (cuándo termina)
+      leader.rs            quién va ganando + su corona
+    scene/             LA ESCENA: lo que se ve sin tocarse
+      background/          telón: palette, sky, stars, clouds + BackdropSeed
+      camera.rs            cámara, luces y checks de encuadre
+  production/          EL OBSERVADOR externo del pipeline
     voice_tracker.rs   track_race_leader, save_voice_tracker_on_exit
 ```
 

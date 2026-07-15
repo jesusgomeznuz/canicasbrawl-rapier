@@ -3,7 +3,7 @@ use bevy::text::TextLayoutInfo;
 
 use super::finish::RaceResult;
 use super::labels::MarbleLabel;
-use super::marbles::Marble;
+use crate::game::world::marbles::Marble;
 
 #[derive(Resource, Default)]
 pub struct RaceLeader {

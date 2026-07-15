@@ -1,13 +1,20 @@
 use bevy::prelude::*;
 
+/// La semilla visual del telón: estrellas y nubes deterministas en ambos
+/// mundos (por eso --play también recibe --seed). No siembra el nivel — eso
+/// es de los Dice del engine.
+#[derive(Resource)]
+pub struct BackdropSeed(pub u64);
+
 pub mod clouds;
 pub mod palette;
 pub mod sky;
 pub mod stars;
 
 /// El telón de fondo: la paleta, el cielo, las estrellas y las nubes en su lugar.
-pub fn paint_the_backdrop(app: &mut App, palette: palette::ColorPalette) {
-    app.insert_resource(ClearColor(palette.clear_color()))
+pub fn paint_the_backdrop(app: &mut App, palette: palette::ColorPalette, seed: u64) {
+    app.insert_resource(BackdropSeed(seed))
+        .insert_resource(ClearColor(palette.clear_color()))
         .insert_resource(palette)
         .add_systems(
             Startup,

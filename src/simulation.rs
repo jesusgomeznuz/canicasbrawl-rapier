@@ -3,8 +3,8 @@ use rapier_bevy::{GameAppConfig, game_app};
 
 use crate::args::RosterSpec;
 use crate::game;
-use crate::game::background::palette::ColorPalette;
-use crate::game::roster::MarbleConfig;
+use crate::game::scene::background::palette::ColorPalette;
+use crate::game::race::roster::MarbleConfig;
 use crate::production;
 
 pub fn run(seed: u64, spec: RosterSpec, palette: ColorPalette, video_secs: f32) {
@@ -26,9 +26,9 @@ pub fn run(seed: u64, spec: RosterSpec, palette: ColorPalette, video_secs: f32) 
 }
 
 fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorPalette, video_secs: f32) {
-    game::prepare_the_race(app, roster);
-    game::world::build_the_world(app, seed, finish_target_secs(video_secs));
-    game::background::paint_the_backdrop(app, palette);
+    game::race::prepare_the_race(app, roster, finish_target_secs(video_secs));
+    game::world::build_the_world(app);
+    game::scene::paint_the_backdrop(app, palette, seed);
     production::initialize_voice_tracker(app);
 }
 
@@ -38,15 +38,18 @@ fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorP
 // se anima, PostUpdate = los que persiguen posiciones ya firmes). La banda de
 // eventos es estructura del engine: el juego solo pone su escenografía.
 fn on_update(app: &mut App) {
+    // EL MUNDO trabaja
     game::world::generate_the_level(app);
-    game::sensors::run_the_sensors(app);
+    game::world::run_the_sensors(app);
     rapier_bevy::run_the_event_band::<game::race_events::RaceEvent, _>(
         app,
-        game::staging::stage_race_events,
+        game::world::staging::stage_race_events,
     );
-    game::track_the_leader(app);
-    game::background::animate_the_backdrop(app);
-    game::labels::follow_the_marbles(app);
+    // LA CARRERA se mide
+    game::race::track_the_leader(app);
+    game::race::follow_the_marbles(app);
+    // LA ESCENA respira
+    game::scene::animate_the_backdrop(app);
 }
 
 fn on_exit(app: &mut App) {
@@ -55,9 +58,9 @@ fn on_exit(app: &mut App) {
 
 fn resolve_roster(spec: RosterSpec) -> Vec<MarbleConfig> {
     match spec {
-        RosterSpec::Default => game::roster::build_roster(None),
-        RosterSpec::Characters(names) => game::roster::build_roster(Some(names)),
-        RosterSpec::Slots(n) => game::roster::slots_roster(n),
+        RosterSpec::Default => game::race::roster::build_roster(None),
+        RosterSpec::Characters(names) => game::race::roster::build_roster(Some(names)),
+        RosterSpec::Slots(n) => game::race::roster::slots_roster(n),
     }
     .unwrap_or_else(|err| {
         eprintln!("Error de roster: {err}");

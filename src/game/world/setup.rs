@@ -3,14 +3,15 @@ use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
 use rapier_bevy::AssetsLoading;
 
-use super::level_generation::{FinishTarget, LevelGen};
+use super::level_generation::LevelGen;
+use crate::game::race::finish::FinishTarget;
 use super::structures::spawn_wall_segment;
-use crate::game::background::palette::ColorPalette;
+use crate::game::scene::background::palette::ColorPalette;
 
 pub fn setup(
     mut commands: Commands,
     finish_target: Res<FinishTarget>,
-    roster: Res<crate::game::roster::Roster>,
+    roster: Res<crate::game::race::roster::Roster>,
     palette: Res<ColorPalette>,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -34,7 +35,7 @@ pub fn setup(
     );
     commands.insert_resource(LevelGen::new(first_module_top, finish_target.0));
 
-    crate::game::marbles::spawn_marbles(
+    crate::game::world::marbles::spawn_marbles(
         &mut commands,
         &asset_server,
         &mut meshes,

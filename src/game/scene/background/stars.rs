@@ -5,7 +5,7 @@ use rand::Rng;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 
-use crate::game::world::level_generation::LevelSeed;
+use super::BackdropSeed;
 
 #[derive(Component)]
 pub struct BackgroundStar {
@@ -24,7 +24,7 @@ pub fn spawn_stars(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    seed: Res<LevelSeed>,
+    seed: Res<BackdropSeed>,
 ) {
     let config = StarConfig::default();
     // Sub-semilla derivada del level seed para que el campo de estrellas sea

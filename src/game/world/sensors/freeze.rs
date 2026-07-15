@@ -4,8 +4,8 @@ use bevy_rapier3d::prelude::*;
 
 use super::badges::{EffectKind, EffectTimerBadge, spawn_badge};
 use crate::game::race_events::RaceEvent;
-use crate::game::camera::world_pos_on_screen;
-use crate::game::marbles::{Marble, MarbleIndex};
+use crate::game::scene::camera::world_pos_on_screen;
+use crate::game::world::marbles::{Marble, MarbleIndex};
 
 #[derive(Component)]
 pub struct FreezeEffect;

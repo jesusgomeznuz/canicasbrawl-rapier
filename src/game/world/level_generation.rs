@@ -4,14 +4,8 @@ use rapier_bevy::Dice;
 
 use super::modules::{ModuleSpan, module_height, spawn_module};
 use super::structures::{spawn_floor, spawn_wall_segment};
-use crate::game::marbles::Marble;
+use crate::game::world::marbles::Marble;
 use crate::game::race_events::RaceEvent;
-
-#[derive(Resource)]
-pub struct LevelSeed(pub u64);
-
-#[derive(Resource)]
-pub struct FinishTarget(pub f32);
 
 #[derive(Resource)]
 pub struct LevelGen {
@@ -130,7 +124,7 @@ pub fn close_level_with_finish(
         floor_y,
         obstacle_color,
     );
-    crate::game::finish::spawn_finish_line(commands, meshes, materials, asset_server, finish_y);
+    crate::game::race::finish::spawn_finish_line(commands, meshes, materials, asset_server, finish_y);
 }
 
 pub fn disable_modules_above_screen(
@@ -143,7 +137,7 @@ pub fn disable_modules_above_screen(
     };
     let exit_margin = 0.5;
     for (entity, span) in &modules {
-        if crate::game::camera::world_y_above_screen(
+        if crate::game::scene::camera::world_y_above_screen(
             span.bottom,
             exit_margin,
             projection,

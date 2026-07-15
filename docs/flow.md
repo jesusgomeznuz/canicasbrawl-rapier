@@ -91,28 +91,14 @@ flowchart TD
     main --> sim["simulation.rs<br/>3 fases de vida:<br/>on_start / on_update / on_exit<br/>cero ramas de modo"]
     main --> pm["process_modules/<br/>mod: run + transform<br/>shapes: un from_raw por forma<br/>torus_assets: .obj/.compound"]
 
-    sim --> race["race_events.rs<br/>ADUANA: enum RaceEvent<br/>derive de serde = ida y vuelta<br/>desde la estructura misma<br/>(la banda vive en el engine)"]
-    sim --> staging["staging.rs<br/>escenografía única de ambos mundos<br/>consume RaceEvent"]
-    sim --> roster["roster.rs<br/>casting: build_roster / slots_roster"]
-    sim --> finish["finish.rs<br/>meta y orden de llegada"]
-    sim --> leader["leader.rs<br/>quién va ganando + su corona"]
-    sim --> camera["camera.rs<br/>cámara, luces, checks de encuadre"]
-    sim --> marbles["marbles.rs<br/>la canica: componentes,<br/>ensamblador, cuerpo, mesh"]
-    sim --> labels["labels.rs<br/>etiquetas de nombre"]
-    sim --> faces["faces.rs<br/>cara: PNG + color dominante"]
-    sim --> tracker["production/voice_tracker.rs"]
+    sim --> aduana["race_events.rs<br/>ADUANA: enum RaceEvent<br/>derive de serde = ida y vuelta<br/>desde la estructura misma<br/>(la banda vive en el engine)"]
+    sim --> worlddir["world/ — EL MUNDO (interactuable)<br/>level_generation: el director de pista<br/>modules: aduana JSON + spawn_module<br/>marbles: el cuerpo de la canica<br/>staging: la escenografía de ambos mundos<br/>sensors/: freeze, shrink, swap, bouncy<br/>pickups + setup + structures"]
+    sim --> racedir["race/ — LA CARRERA<br/>roster: casting · faces: la cara<br/>labels: etiquetas de nombre<br/>finish: meta + FinishTarget<br/>leader: el líder + su corona"]
+    sim --> scenedir["scene/ — LA ESCENA<br/>background/: telón + BackdropSeed<br/>camera: encuadre y luces"]
+    sim --> tracker["production/ — EL OBSERVADOR<br/>voice_tracker.rs"]
 
-    sim --> worlddir["world/<br/>level_generation: el director<br/>modules: el constructor (aduana JSON + spawn)<br/>pickups: qué efecto cae en cada slot<br/>setup + structures"]
-    sim --> sensorsdir["sensors/<br/>freeze, shrink, swap, bouncy<br/>+ badges e icons compartidos"]
-    sim --> bgdir["background/<br/>palette, sky, stars, clouds"]
-
-    staging --> worlddir
-    staging --> sensorsdir
     worlddir --> ModulesJSON[("assets/modules/*.json")]
-    marbles --> labels
-    marbles --> faces
-    marbles --> roster
-    race --> engine[("rapier-bevy<br/>timeline.rs + plugins")]
+    aduana --> engine[("rapier-bevy<br/>timeline.rs + plugins")]
     sim --> engine
 ```
 
