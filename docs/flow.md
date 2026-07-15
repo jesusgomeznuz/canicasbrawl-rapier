@@ -11,7 +11,7 @@ flowchart TD
     Match -- BuildModules --> Editor["process_modules::run()"]
     Match -- "Simulation(seed, roster, palette, video_secs)" --> Run["simulation::run<br/>roster: Default | Characters | Slots(n)"]
 
-    Run --> Fases["random_physics_game_app(config con seed)<br/>━━━━━━━━━━━━━<br/>on_start — nacer:<br/>prepare_the_race (elenco + marcador),<br/>build_the_world (mundo, gravedad, cámara, corona),<br/>paint_the_backdrop (cielo, estrellas, nubes),<br/>initialize_voice_tracker (producción enciende el micrófono)<br/>━━━━━━━━━━━━━<br/>on_update — el loop central, actos por semántica<br/>(cada uno declara su ritmo adentro):<br/>• generate_the_level — el director tira los Dice del engine (FixedUpdate)<br/>• run_the_sensors — oídos, relojes e insignias<br/>• run_the_event_band::&lt;RaceEvent&gt; (engine) + stage_race_events<br/>• track_the_leader — meta → líder → voz (chain), cámara,<br/>&nbsp;&nbsp;corona persiguiendo (PostUpdate)<br/>• animate_the_backdrop + follow_the_marbles — lo visual persigue<br/>━━━━━━━━━━━━━<br/>on_exit — morir: save_voice_tracker_on_exit"]
+    Run --> Fases["game_app(config con seed)<br/>━━━━━━━━━━━━━<br/>on_start — nacer:<br/>prepare_the_race (elenco + marcador),<br/>build_the_world (mundo, gravedad, cámara, corona),<br/>paint_the_backdrop (cielo, estrellas, nubes),<br/>initialize_voice_tracker (producción enciende el micrófono)<br/>━━━━━━━━━━━━━<br/>on_update — el loop central, actos por semántica<br/>(cada uno declara su ritmo adentro):<br/>• generate_the_level — el director tira los Dice del engine (FixedUpdate)<br/>• run_the_sensors — oídos, relojes e insignias<br/>• run_the_event_band::&lt;RaceEvent&gt; (engine) + stage_race_events<br/>• track_the_leader — meta → líder → voz (chain), cámara,<br/>&nbsp;&nbsp;corona persiguiendo (PostUpdate)<br/>• animate_the_backdrop + follow_the_marbles — lo visual persigue<br/>━━━━━━━━━━━━━<br/>on_exit — morir: save_voice_tracker_on_exit"]
 
     Fases --> Dark["el ENGINE decide el mundo, a oscuras del juego:<br/>nativo y --write-timeline → física + Dice en la mesa<br/>--play → sin física ni Dice: la partitura dicta poses y eventos,<br/>y todo sistema que declare choques (EventReader&lt;CollisionEvent&gt;)<br/>o azar (ResMut&lt;Dice&gt;) se duerme solo"]
 
@@ -32,9 +32,9 @@ SIEMPRE de `.compound` — quien fabrica el asset fabrica su compound.
 
 ```mermaid
 flowchart LR
-    Game["canicasbrawl-rapier<br/>main + args + simulation<br/>+ game/ + production/ + process_modules/"] -->|random_physics_game_app + add_systems| Engine
+    Game["canicasbrawl-rapier<br/>main + args + simulation<br/>+ game/ + production/ + process_modules/"] -->|game_app + add_systems| Engine
     Engine["rapier-bevy<br/>engine, modes, timeline, plugins, world_objects"] -->|expone| API["API:<br/>spawn_object, ObjectDef, ColliderShape...<br/>timeline.rs: Timeline, Pose, TimelineKey,<br/>TimelineEvents, PlayEvent, Dice,<br/>TimelineVocabulary + run_the_event_band + EventBand<br/>WriteTimelinePlugin / PlayPlugin / RecordPlugin<br/>timeline_path / write_timeline_duration / record_duration<br/>/ session_duration_secs"]
-    Demo["rapier-bevy/main.rs<br/>demo: vehículo + escalera"] -->|random_physics_game_app + setup| Engine
+    Demo["rapier-bevy/main.rs<br/>demo: vehículo + escalera"] -->|game_app + setup| Engine
 ```
 
 El engine no conoce a ningún juego: mueve cuerpos, escribe y actúa timelines,
