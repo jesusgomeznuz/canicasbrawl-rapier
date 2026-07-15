@@ -11,9 +11,12 @@ pub mod roster;
 pub use labels::follow_the_marbles;
 
 /// Se pactan las reglas de la partida: el elenco (quiénes juegan), el marcador
-/// (líder, meta y resultado, aún vacíos) y cuándo termina la carrera.
+/// (líder, meta y resultado, aún vacíos), cuándo termina la carrera — y de
+/// paso producción enciende su micrófono (viaja aquí por peso, no por oficio:
+/// inicializar un vector no merece acto propio; su trabajo vive en production/).
 pub fn prepare_the_race(app: &mut App, marbles: Vec<roster::MarbleConfig>, finish_target_secs: f32) {
-    app.insert_resource(finish::RaceResult::default())
+    app.insert_resource(crate::production::voice_tracker::VoiceTracker::default())
+        .insert_resource(finish::RaceResult::default())
         .insert_resource(finish::FinishLineY::default())
         .insert_resource(finish::FinishTarget(finish_target_secs))
         .insert_resource(leader::RaceLeader::default())
