@@ -9,13 +9,13 @@ pub mod sensors;
 pub mod staging;
 pub mod structures;
 
-pub use sensors::run_the_sensors;
+pub use sensors::update_sensors;
 
 /// El EDIFICIO del nacimiento: los pisos de la obra, todos a la vista — muros,
 /// gravedad, el primer módulo (el director tira los dados por primera vez),
 /// las canicas (el mundo le pone cuerpo al elenco), y la cámara y la corona,
 /// que también son entidades que se colocan en el mundo (actualizarlas ya es
-/// oficio de track_the_leader). Cero pizarras: construir significa construir.
+/// oficio de follow_the_leader). Cero pizarras: construir significa construir.
 pub fn build_the_world(app: &mut App) {
     app.add_systems(
         Startup,
@@ -35,7 +35,7 @@ pub fn build_the_world(app: &mut App) {
 /// pantalla. Declara `ResMut<Dice>`: donde no hay dados en la mesa (la suerte
 /// ya está escrita en la partitura) se duerme solo, y los módulos llegan como
 /// eventos a la escenografía.
-pub fn generate_the_level(app: &mut App) {
+pub fn spawn_next_module(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (

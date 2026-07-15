@@ -10,16 +10,3 @@ pub mod clouds;
 pub mod palette;
 pub mod sky;
 pub mod stars;
-
-/// El telón respira: el cielo sigue a la cámara, las estrellas titilan, las nubes derivan.
-pub fn animate_the_backdrop(app: &mut App) {
-    app.add_systems(
-        Update,
-        (
-            sky::update_sky_with_camera,
-            stars::stars_follow_camera,
-            stars::twinkle_stars,
-            clouds::update_clouds,
-        ),
-    );
-}

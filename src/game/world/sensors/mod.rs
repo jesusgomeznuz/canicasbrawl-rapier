@@ -15,7 +15,7 @@ pub mod swap;
 /// Los relojes descongelan, devuelven el tamaño y apagan anillos y pulsos.
 /// Las insignias nacen y mueren con el efecto (Update) y persiguen a su canica
 /// cuando las posiciones del frame ya quedaron firmes (PostUpdate).
-pub fn run_the_sensors(app: &mut App) {
+pub fn update_sensors(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (

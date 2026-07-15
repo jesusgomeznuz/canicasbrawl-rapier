@@ -18,6 +18,12 @@ pub fn run(seed: u64, spec: RosterSpec, palette: ColorPalette, video_secs: f32) 
             seed,
         },
     );
+    // La banda de eventos se conecta al armar la mesa: estructura del engine
+    // (replay → record) + la escenografía del juego como único músico propio.
+    rapier_bevy::run_the_event_band::<game::race_events::RaceEvent, _>(
+        &mut app,
+        game::world::staging::stage_race_events,
+    );
     on_start(&mut app, seed, roster, palette, video_secs);
     on_update(&mut app);
     on_exit(&mut app);
@@ -34,21 +40,16 @@ fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorP
 // El loop central: todo lo que se repite, agrupado por semántica y ordenado
 // como se cuenta la carrera. Cada acto declara su ritmo adentro con el
 // vocabulario de Bevy (FixedUpdate = la verdad de la carrera, Update = lo que
-// se anima, PostUpdate = los que persiguen posiciones ya firmes). La banda de
-// eventos es estructura del engine: el juego solo pone su escenografía.
+// se anima, PostUpdate = los que persiguen posiciones ya firmes).
 fn on_update(app: &mut App) {
     // EL MUNDO trabaja
-    game::world::generate_the_level(app);
-    game::world::run_the_sensors(app);
-    rapier_bevy::run_the_event_band::<game::race_events::RaceEvent, _>(
-        app,
-        game::world::staging::stage_race_events,
-    );
+    game::world::spawn_next_module(app);
+    game::world::update_sensors(app);
     // LA CARRERA se mide
-    game::race::track_the_leader(app);
-    game::race::follow_the_marbles(app);
+    game::race::follow_the_leader(app);
+    game::race::update_labels(app);
     // LA ESCENA respira
-    game::scene::animate_the_backdrop(app);
+    game::scene::update_scene(app);
 }
 
 fn on_exit(app: &mut App) {

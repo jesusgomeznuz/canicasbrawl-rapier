@@ -8,7 +8,7 @@ pub mod labels;
 pub mod leader;
 pub mod roster;
 
-pub use labels::follow_the_marbles;
+pub use labels::update_labels;
 
 /// Se pactan las reglas de la partida: el elenco (quiénes juegan), el marcador
 /// (líder, meta y resultado, aún vacíos), cuándo termina la carrera — y de
@@ -27,7 +27,8 @@ pub fn prepare_the_race(app: &mut App, marbles: Vec<roster::MarbleConfig>, finis
 /// quién canta (la verdad, a paso de física), la cámara que lo sigue, y la
 /// corona que se pega al líder cuando las posiciones del frame ya quedaron
 /// firmes (la corona se COLOCA en build_the_world, como la cámara).
-pub fn track_the_leader(app: &mut App) {
+/// Solo se sigue a UNO: al líder — las canicas compiten por serlo.
+pub fn follow_the_leader(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (

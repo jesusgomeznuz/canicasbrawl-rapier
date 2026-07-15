@@ -3,9 +3,9 @@ use bevy::transform::TransformSystem;
 
 use crate::game::world::marbles::Marble;
 
-/// Las etiquetas de nombre persiguen a su canica: proyectan mundo→pantalla
+/// Se actualizan las etiquetas de las canicas: proyectan mundo→pantalla
 /// cuando todas las posiciones del frame ya quedaron firmes.
-pub fn follow_the_marbles(app: &mut App) {
+pub fn update_labels(app: &mut App) {
     app.add_systems(
         PostUpdate,
         update_marble_labels.after(TransformSystem::TransformPropagate),
