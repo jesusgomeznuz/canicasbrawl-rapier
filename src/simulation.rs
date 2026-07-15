@@ -32,9 +32,9 @@ pub fn run(seed: u64, spec: RosterSpec, palette: ColorPalette, video_secs: f32) 
 }
 
 fn on_start(app: &mut App, seed: u64, roster: Vec<MarbleConfig>, palette: ColorPalette, video_secs: f32) {
-    game::race::prepare_the_race(app, roster, finish_target_secs(video_secs));
     game::world::build_world(app);
-    game::scene::prepare_the_scene(app, palette, seed);
+    game::scene::build_scene(app, palette, seed);
+    game::race::build_race(app, roster, finish_target_secs(video_secs));
 }
 
 // El loop central: todo lo que se repite, agrupado por semántica y ordenado

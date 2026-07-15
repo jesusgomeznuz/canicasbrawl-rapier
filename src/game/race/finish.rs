@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::game::world::marbles::{Marble, MarbleName};
 
 /// Cuándo termina la carrera: a los N segundos la meta aparece al horizonte.
-/// Regla de la partida — la coloca prepare_the_race; el director la lee.
+/// Regla de la partida — la coloca build_race; el director la lee.
 #[derive(Resource)]
 pub struct FinishTarget(pub f32);
 

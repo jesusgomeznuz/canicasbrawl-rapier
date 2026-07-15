@@ -12,7 +12,7 @@ pub mod roster;
 /// (líder, meta y resultado, aún vacíos), cuándo termina la carrera — y de
 /// paso producción enciende su micrófono (viaja aquí por peso, no por oficio:
 /// inicializar un vector no merece acto propio; su trabajo vive en production/).
-pub fn prepare_the_race(app: &mut App, marbles: Vec<roster::MarbleConfig>, finish_target_secs: f32) {
+pub fn build_race(app: &mut App, marbles: Vec<roster::MarbleConfig>, finish_target_secs: f32) {
     app.insert_resource(crate::production::voice_tracker::VoiceTracker::default())
         .insert_resource(finish::RaceResult::default())
         .insert_resource(finish::FinishLineY::default())
