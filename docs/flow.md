@@ -12,22 +12,19 @@ flowchart TD
     Match -- PreprocessConcaveColliders --> Pre["preprocess_concave_colliders"]
     Match -- "Simulation(mode, seed, roster, palette)" --> Run["simulation::run<br/>roster: Default | Characters | Slots(n)"]
 
-    Run --> Fases["random_physics_game_app(mode, config)<br/>━━━━━━━━━━━━━<br/>on_start — dispara una vez al arrancar:<br/>10 resources + spawns: cámara, corona, mundo,<br/>gravedad, cielo, estrellas, nubes<br/>━━━━━━━━━━━━━<br/>on_step — cada step de física (60/s, after Writeback):<br/>• liderazgo: check_finish_crossing →<br/>&nbsp;&nbsp;update_race_leader → track_race_leader (chain)<br/>• banda de eventos: emit_race_events_from_timeline →<br/>&nbsp;&nbsp;send_race_events_to_timeline → stage_race_events (chain)<br/>• timers/animaciones en paralelo: try_unfreeze, try_unshrink,<br/>&nbsp;&nbsp;fade_swap_rings, spin_icons, bounce pulse y cooldown,<br/>&nbsp;&nbsp;camera_follows_lowest_marble<br/>━━━━━━━━━━━━━<br/>on_frame_update — cada frame de pantalla (wall-clock):<br/>fondo sigue cámara, twinkle, nubes, manage badges, stall_detector<br/>━━━━━━━━━━━━━<br/>after_frame_update — posiciones ya finales (PostUpdate):<br/>update_marble_labels, crown_follows_leader, update_badges<br/>━━━━━━━━━━━━━<br/>on_exit: save_voice_tracker_on_exit"]
+    Run --> Fases["random_physics_game_app(mode, config con seed)<br/>━━━━━━━━━━━━━<br/>on_start — nacer:<br/>prepare_the_race (elenco + marcador),<br/>build_the_world (mundo, gravedad, cámara, corona),<br/>paint_the_backdrop (cielo, estrellas, nubes),<br/>initialize_voice_tracker (producción enciende el micrófono)<br/>━━━━━━━━━━━━━<br/>on_update — el loop central, actos por semántica<br/>(cada uno declara su ritmo adentro):<br/>• generate_the_level — el director tira los Dice del engine (FixedUpdate)<br/>• run_the_sensors — oídos, relojes e insignias<br/>• run_the_event_band::&lt;RaceEvent&gt; (engine) + stage_race_events<br/>• track_the_leader — meta → líder → voz (chain), cámara,<br/>&nbsp;&nbsp;corona persiguiendo (PostUpdate)<br/>• animate_the_backdrop + follow_the_marbles — lo visual persigue<br/>━━━━━━━━━━━━━<br/>on_exit — morir: save_voice_tracker_on_exit"]
 
-    Fases --> If{"timeline_path().is_none()<br/>¿no hay timeline que reproducir?"}
-    If -- "sí: mundo con física (dev y write-timeline)" --> Fisica["react_to_real_collisions:<br/>generate_level, disable_modules_above_screen,<br/>on_freeze/shrink/swap_contact, trigger_bouncy_pulse<br/>— detectan, aplican física y EMITEN RaceEvent"]
-    If -- "no: mundo actuado (--play)" --> Play["nada extra: el PlayPlugin del engine<br/>escribe poses y re-emite PlayEvents;<br/>la banda común los escenifica"]
+    Fases --> Dark["el ENGINE decide el mundo, a oscuras del juego:<br/>nativo y --write-timeline → física + Dice en la mesa<br/>--play → sin física ni Dice: la partitura dicta poses y eventos,<br/>y todo sistema que declare choques (EventReader&lt;CollisionEvent&gt;)<br/>o azar (ResMut&lt;Dice&gt;) se duerme solo"]
 
     Editor --> End([exit])
     Pre --> End
-    Fisica --> Loop["app.run"]
-    Play --> Loop
+    Dark --> Loop["app.run"]
     Loop --> End
 ```
 
-`simulation.rs` es el flowchart del juego: cinco fases con nombre de momento
-(`on_start` → `on_step` → `on_frame_update` → `after_frame_update` → `on_exit`)
-y una sola rama. Cmd+click sobre cualquier system salta a su implementación.
+`simulation.rs` es la vida del juego en tres fases (`on_start` → `on_update` →
+`on_exit`), sin una sola rama de modos: el juego declara necesidades y el
+engine arma la mesa. Cmd+click sobre cualquier system salta a su implementación.
 
 `--bench` no es modo del juego. Para correrlo: `cd ../rapier-bevy && cargo run -- --bench falling-spheres 200`.
 
@@ -36,13 +33,15 @@ y una sola rama. Cmd+click sobre cualquier system salta a su implementación.
 ```mermaid
 flowchart LR
     Game["canicasbrawl-rapier<br/>main + args + simulation<br/>+ game/ + production/ + process_modules/"] -->|random_physics_game_app + add_systems| Engine
-    Engine["rapier-bevy<br/>engine, modes, timeline, plugins, world_objects"] -->|expone| API["API:<br/>spawn_object, ObjectDef, ColliderShape...<br/>timeline.rs: Timeline, Pose, TimelineKey,<br/>TimelineEvents, PlayEvent<br/>WriteTimelinePlugin / PlayPlugin / RecordPlugin<br/>timeline_path / write_timeline_duration / record_duration"]
+    Engine["rapier-bevy<br/>engine, modes, timeline, plugins, world_objects"] -->|expone| API["API:<br/>spawn_object, ObjectDef, ColliderShape...<br/>timeline.rs: Timeline, Pose, TimelineKey,<br/>TimelineEvents, PlayEvent, Dice,<br/>TimelineVocabulary + run_the_event_band + EventBand<br/>WriteTimelinePlugin / PlayPlugin / RecordPlugin<br/>timeline_path / write_timeline_duration / record_duration<br/>/ session_duration_secs"]
     Demo["rapier-bevy/main.rs<br/>demo: vehículo + escalera"] -->|random_physics_game_app + setup| Engine
 ```
 
 El engine no conoce a ningún juego: mueve cuerpos, escribe y actúa timelines,
-y transporta eventos como sobres opacos. Cada juego pone su cámara, sus
-sistemas y su vocabulario (`RaceEvent`).
+pone (o no) los Dice en la mesa, y toca la banda de eventos completa — el
+juego solo aporta su vocabulario (`impl TimelineVocabulary for RaceEvent`) y
+su escenografía. En `--play` duerme, por necesidad ausente, a todo sistema que
+declare choques o azar: el juego jamás pregunta por modos.
 
 ## 3. Pipeline editor → juego
 
@@ -89,10 +88,10 @@ publisher, con feedback de métricas al planner). Sus diagramas viven en
 ```mermaid
 flowchart TD
     main["main.rs<br/>match: 3 comandos"] --> args["args.rs<br/>Command, RosterSpec"]
-    main --> sim["simulation.rs<br/>5 fases + banda de eventos<br/>+ if timeline_path().is_none()"]
+    main --> sim["simulation.rs<br/>3 fases de vida:<br/>on_start / on_update / on_exit<br/>cero ramas de modo"]
     main --> pm["process_modules/<br/>mod: run + transform<br/>shapes: un from_raw por forma<br/>torus_assets: .obj/.compound"]
 
-    sim --> race["race_events.rs<br/>ADUANA: enum RaceEvent<br/>payload + parse juntos<br/>+ puentes send/emit"]
+    sim --> race["race_events.rs<br/>ADUANA: enum RaceEvent<br/>payload + parse juntos<br/>(impl TimelineVocabulary;<br/>la banda vive en el engine)"]
     sim --> staging["staging.rs<br/>escenografía única de ambos mundos<br/>consume RaceEvent"]
     sim --> roster["roster.rs<br/>casting: build_roster / slots_roster"]
     sim --> finish["finish.rs<br/>meta y orden de llegada"]
@@ -102,7 +101,6 @@ flowchart TD
     sim --> labels["labels.rs<br/>etiquetas de nombre"]
     sim --> faces["faces.rs<br/>cara: PNG + color dominante"]
     sim --> tracker["production/voice_tracker.rs"]
-    sim --> stall["production/stall_detector.rs"]
 
     sim --> worlddir["world/<br/>level_generation: el director<br/>modules: el constructor (aduana JSON + spawn)<br/>pickups: qué efecto cae en cada slot<br/>setup + structures"]
     sim --> sensorsdir["sensors/<br/>freeze, shrink, swap, bouncy<br/>+ badges e icons compartidos"]
