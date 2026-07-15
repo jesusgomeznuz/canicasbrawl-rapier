@@ -33,13 +33,13 @@ SIEMPRE de `.compound` — quien fabrica el asset fabrica su compound.
 ```mermaid
 flowchart LR
     Game["canicasbrawl-rapier<br/>main + args + simulation<br/>+ game/ + production/ + process_modules/"] -->|game_app + add_systems| Engine
-    Engine["rapier-bevy<br/>engine, modes, timeline, plugins, world_objects"] -->|expone| API["API:<br/>spawn_object, ObjectDef, ColliderShape...<br/>timeline.rs: Timeline, Pose, TimelineKey,<br/>TimelineEvents, PlayEvent, Dice,<br/>TimelineVocabulary + run_the_event_band + EventBand<br/>WriteTimelinePlugin / PlayPlugin / RecordPlugin<br/>timeline_path / write_timeline_duration / record_duration<br/>/ session_duration_secs"]
+    Engine["rapier-bevy<br/>engine, modes, timeline, plugins, world_objects"] -->|expone| API["API:<br/>spawn_object, ObjectDef, ColliderShape...<br/>timeline.rs: Timeline, Pose, TimelineKey,<br/>TimelineEvents, PlayEvent, Dice,<br/>run_the_event_band + EventBand<br/>WriteTimelinePlugin / PlayPlugin / RecordPlugin<br/>timeline_path / write_timeline_duration / record_duration<br/>/ session_duration_secs"]
     Demo["rapier-bevy/main.rs<br/>demo: vehículo + escalera"] -->|game_app + setup| Engine
 ```
 
 El engine no conoce a ningún juego: mueve cuerpos, escribe y actúa timelines,
 pone (o no) los Dice en la mesa, y toca la banda de eventos completa — el
-juego solo aporta su vocabulario (`impl TimelineVocabulary for RaceEvent`) y
+juego solo aporta su aduana (`#[derive(Event, Serialize, Deserialize)]` en su enum) y
 su escenografía. En `--play` duerme, por necesidad ausente, a todo sistema que
 declare choques o azar: el juego jamás pregunta por modos.
 
@@ -91,7 +91,7 @@ flowchart TD
     main --> sim["simulation.rs<br/>3 fases de vida:<br/>on_start / on_update / on_exit<br/>cero ramas de modo"]
     main --> pm["process_modules/<br/>mod: run + transform<br/>shapes: un from_raw por forma<br/>torus_assets: .obj/.compound"]
 
-    sim --> race["race_events.rs<br/>ADUANA: enum RaceEvent<br/>payload + parse juntos<br/>(impl TimelineVocabulary;<br/>la banda vive en el engine)"]
+    sim --> race["race_events.rs<br/>ADUANA: enum RaceEvent<br/>derive de serde = ida y vuelta<br/>desde la estructura misma<br/>(la banda vive en el engine)"]
     sim --> staging["staging.rs<br/>escenografía única de ambos mundos<br/>consume RaceEvent"]
     sim --> roster["roster.rs<br/>casting: build_roster / slots_roster"]
     sim --> finish["finish.rs<br/>meta y orden de llegada"]

@@ -43,7 +43,7 @@ El engine no conoce al juego. El juego consume el engine vía `game_app(GameAppC
 | Módulo | Responsabilidad |
 |---|---|
 | `src/engine.rs` | `game_app(config) -> App` — arma el `App` según el modo del pipeline: física + `Dice` (nativo y write-timeline) o partitura (`--play`, donde duerme por necesidad ausente a quien declare choques o azar) |
-| `src/timeline.rs` | El contrato bake/replay: `Timeline`, `Pose`, `TimelineKey`, `TimelineEvents`, `PlayEvent`, `Dice`, y la banda genérica (`TimelineVocabulary`, `run_the_event_band`, `EventBand`) |
+| `src/timeline.rs` | El contrato bake/replay: `Timeline`, `Pose`, `TimelineKey`, `TimelineEvents`, `PlayEvent`, `Dice`, y la banda genérica (`run_the_event_band`, `EventBand`) — la aduana de cada juego es su derive de serde |
 | `src/modes.rs` | La puerta del engine — preguntas puras sobre flags del pipeline: `record_duration()`, `write_timeline_duration()`, `timeline_path()`, `session_duration_secs()` |
 | `src/plugins/record.rs` | `RecordPlugin` — captura GPU offscreen y pipe a ffmpeg via `crossbeam-channel`. Expone `OffscreenTarget` |
 | `src/plugins/physics_stats.rs` | `PhysicsStatsPlugin` — overlay de estadísticas de física |
@@ -68,8 +68,8 @@ src/
     shapes.rs          un from_raw por forma + parseo de tags del nombre
     torus_assets.rs    fábrica de .obj/.compound del torus
   game/
-    race_events.rs     ADUANA de eventos: enum RaceEvent, payload+parse juntos
-                       (impl TimelineVocabulary — la banda vive en el engine)
+    race_events.rs     ADUANA de eventos: enum RaceEvent con derive de serde
+                       (ida y vuelta derivadas — la banda vive en el engine)
     staging.rs         escenografía única de ambos mundos (consume RaceEvent)
     marbles.rs         la canica: componentes, ensamblador, cuerpo, mesh
     labels.rs          etiquetas de nombre: spawn + seguimiento en pantalla
@@ -118,9 +118,10 @@ la ficha técnica es visible.
 
 Play NO re-simula ni re-deriva nada: todo cruza de write-timeline a play como datos
 (poses por TimelineKey, eventos tipados para lo demás). El contrato universal
-vive en `../rapier-bevy/src/timeline.rs` (Timeline, Pose, TimelineKey, Dice,
-TimelineVocabulary); el vocabulario del juego en `src/game/race_events.rs`
-(enum RaceEvent — payload y parse juntos, `impl TimelineVocabulary`).
+vive en `../rapier-bevy/src/timeline.rs` (Timeline, Pose, TimelineKey, Dice);
+el vocabulario del juego en `src/game/race_events.rs`: el enum
+RaceEvent con `#[derive(Event, Serialize, Deserialize)]` ES la aduana — la ida
+y la vuelta se derivan de la estructura, sin formato a mano que desalinear.
 
 LA LEY DEL JUEGO PURO: el código del juego jamás pregunta por modos. Cada
 sistema DECLARA sus necesidades en la firma y el engine arma la mesa: la
@@ -138,7 +139,7 @@ el juego:
   `pick_module` con su peso. Spawn, BakeKeys y evento `Module` son genéricos.
 - **Más sensores freeze/shrink/swap/bouncy**: cero cambios.
 - **TIPO de efecto nuevo por colisión**: 3 pasos —
-  1. variante nueva en `RaceEvent` (con su payload y su parse);
+  1. variante nueva en `RaceEvent` (el derive de serde hace el resto);
   2. sistema de contacto en su carpeta de sensores (registrado en la gorda
      `run_the_sensors`) que aplica SOLO la parte física y emite la variante —
      su `EventReader<CollisionEvent>` ya lo duerme solo en play;
@@ -152,7 +153,7 @@ el juego:
   de "creador de verdad" que duerme en play.
 
 Nada falla en silencio: sin el brazo de escenografía el match del enum no
-compila; un payload ilegible o keys que no cuadran hacen panic con mensaje.
+compila; un renglón ilegible o keys que no cuadran hacen panic con mensaje.
 
 ## Cómo extender modos
 
