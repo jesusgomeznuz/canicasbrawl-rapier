@@ -8,8 +8,6 @@ pub mod labels;
 pub mod leader;
 pub mod roster;
 
-pub use labels::update_labels;
-
 /// Se pactan las reglas de la partida: el elenco (quiénes juegan), el marcador
 /// (líder, meta y resultado, aún vacíos), cuándo termina la carrera — y de
 /// paso producción enciende su micrófono (viaja aquí por peso, no por oficio:

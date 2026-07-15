@@ -1,16 +1,6 @@
 use bevy::prelude::*;
-use bevy::transform::TransformSystem;
 
 use crate::game::world::marbles::Marble;
-
-/// Se actualizan las etiquetas de las canicas: proyectan mundo→pantalla
-/// cuando todas las posiciones del frame ya quedaron firmes.
-pub fn update_labels(app: &mut App) {
-    app.add_systems(
-        PostUpdate,
-        update_marble_labels.after(TransformSystem::TransformPropagate),
-    );
-}
 
 #[derive(Component)]
 pub struct MarbleLabel(pub Entity);

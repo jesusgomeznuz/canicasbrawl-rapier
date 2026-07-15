@@ -21,7 +21,9 @@ pub fn prepare_the_scene(app: &mut App, palette: background::palette::ColorPalet
 }
 
 /// La escena se actualiza: el cielo sigue a la cámara, las estrellas titilan,
-/// las nubes derivan.
+/// las nubes derivan — y las etiquetas de las canicas se re-proyectan a
+/// pantalla cuando las posiciones ya quedaron firmes (utilería de la carrera
+/// mantenida por la escena: el acto cruza oficios).
 pub fn update_scene(app: &mut App) {
     app.add_systems(
         Update,
@@ -31,5 +33,10 @@ pub fn update_scene(app: &mut App) {
             background::stars::twinkle_stars,
             background::clouds::update_clouds,
         ),
+    );
+    app.add_systems(
+        PostUpdate,
+        crate::game::race::labels::update_marble_labels
+            .after(bevy::transform::TransformSystem::TransformPropagate),
     );
 }

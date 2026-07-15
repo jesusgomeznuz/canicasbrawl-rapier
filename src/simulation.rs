@@ -47,7 +47,6 @@ fn on_update(app: &mut App) {
     game::world::update_sensors(app);
     // LA CARRERA se mide
     game::race::follow_the_leader(app);
-    game::race::update_labels(app);
     // LA ESCENA respira
     game::scene::update_scene(app);
 }
