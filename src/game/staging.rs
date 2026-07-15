@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use rapier_bevy::SimulationMode;
 
 use super::background::palette::ColorPalette;
 use super::race_events::RaceEvent;
@@ -24,7 +23,6 @@ pub fn stage_race_events(
     swap_sensors: Query<(Entity, &Transform), With<SwapEffect>>,
     bouncys: Query<(Entity, &Transform), With<BouncyOnContact>>,
     pulsing: Query<(), Or<(With<BouncePulse>, With<BounceCooldown>)>>,
-    mode: Res<SimulationMode>,
     palette: Res<ColorPalette>,
     asset_server: Res<AssetServer>,
     time: Res<Time>,
@@ -61,13 +59,13 @@ pub fn stage_race_events(
             RaceEvent::Module { name, top, seed } => {
                 spawn_level_module(
                     name, *top, *seed, palette.obstacle_color(),
-                    &mut commands, &mode, &asset_server, &mut meshes, &mut materials,
+                    &mut commands, &asset_server, &mut meshes, &mut materials,
                 );
             }
             RaceEvent::Finish { top } => {
                 close_level_with_finish(
                     *top, palette.obstacle_color(),
-                    &mut commands, &mode, &asset_server, &mut meshes, &mut materials,
+                    &mut commands, &asset_server, &mut meshes, &mut materials,
                 );
             }
             RaceEvent::Bouncy { x, y, amplitude } => {

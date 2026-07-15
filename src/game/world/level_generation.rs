@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use rapier_bevy::{Dice, SimulationMode};
+use rapier_bevy::Dice;
 
 use super::modules::{ModuleSpan, module_height, spawn_module};
 use super::structures::{spawn_floor, spawn_wall_segment};
@@ -74,7 +74,6 @@ pub fn spawn_level_module(
     module_seed: u64,
     obstacle_color: Color,
     commands: &mut Commands,
-    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -86,7 +85,6 @@ pub fn spawn_level_module(
         obstacle_color,
         module_seed,
         commands,
-        mode,
         asset_server,
         meshes,
         materials,
@@ -96,7 +94,6 @@ pub fn spawn_level_module(
         bottom,
         obstacle_color,
         commands,
-        mode,
         asset_server,
         meshes,
         materials,
@@ -108,7 +105,6 @@ pub fn close_level_with_finish(
     next_top: f32,
     obstacle_color: Color,
     commands: &mut Commands,
-    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -122,14 +118,12 @@ pub fn close_level_with_finish(
         floor_y,
         obstacle_color,
         commands,
-        mode,
         asset_server,
         meshes,
         materials,
     );
     spawn_floor(
         commands,
-        mode,
         asset_server,
         meshes,
         materials,

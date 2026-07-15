@@ -16,24 +16,64 @@ use rapier_bevy::TimelineVocabulary;
 
 #[derive(Event, Clone)]
 pub enum RaceEvent {
-    Freeze { marble: usize, x: f32, y: f32, duration: f32 },
-    Shrink { marble: usize, x: f32, y: f32, duration: f32 },
-    Swap { marble_a: usize, marble_b: usize, x: f32, y: f32 },
-    Bouncy { x: f32, y: f32, amplitude: f32 },
-    Module { name: String, top: f32, seed: u64 },
-    Finish { top: f32 },
+    Freeze {
+        marble: usize,
+        x: f32,
+        y: f32,
+        duration: f32,
+    },
+    Shrink {
+        marble: usize,
+        x: f32,
+        y: f32,
+        duration: f32,
+    },
+    Swap {
+        marble_a: usize,
+        marble_b: usize,
+        x: f32,
+        y: f32,
+    },
+    Bouncy {
+        x: f32,
+        y: f32,
+        amplitude: f32,
+    },
+    Module {
+        name: String,
+        top: f32,
+        seed: u64,
+    },
+    Finish {
+        top: f32,
+    },
 }
 
 impl TimelineVocabulary for RaceEvent {
     fn payload(&self) -> String {
         match self {
-            RaceEvent::Freeze { marble, x, y, duration } => {
+            RaceEvent::Freeze {
+                marble,
+                x,
+                y,
+                duration,
+            } => {
                 format!("freeze {marble} {x:.3} {y:.3} {duration}")
             }
-            RaceEvent::Shrink { marble, x, y, duration } => {
+            RaceEvent::Shrink {
+                marble,
+                x,
+                y,
+                duration,
+            } => {
                 format!("shrink {marble} {x:.3} {y:.3} {duration}")
             }
-            RaceEvent::Swap { marble_a, marble_b, x, y } => {
+            RaceEvent::Swap {
+                marble_a,
+                marble_b,
+                x,
+                y,
+            } => {
                 format!("swap {marble_a} {marble_b} {x:.3} {y:.3}")
             }
             RaceEvent::Bouncy { x, y, amplitude } => format!("bouncy {x} {y} {amplitude}"),
@@ -73,7 +113,9 @@ impl TimelineVocabulary for RaceEvent {
                 top: top.parse().ok()?,
                 seed: seed.parse().ok()?,
             }),
-            ["finish", top] => Some(RaceEvent::Finish { top: top.parse().ok()? }),
+            ["finish", top] => Some(RaceEvent::Finish {
+                top: top.parse().ok()?,
+            }),
             _ => None,
         }
     }

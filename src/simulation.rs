@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use rapier_bevy::{GameAppConfig, SimulationMode, random_physics_game_app};
+use rapier_bevy::{GameAppConfig, random_physics_game_app};
 
 use crate::args::RosterSpec;
 use crate::game;
@@ -7,12 +7,11 @@ use crate::game::background::palette::ColorPalette;
 use crate::game::roster::MarbleConfig;
 use crate::production;
 
-pub fn run(mode: SimulationMode, seed: u64, spec: RosterSpec, palette: ColorPalette, video_secs: f32) {
+pub fn run(seed: u64, spec: RosterSpec, palette: ColorPalette, video_secs: f32) {
     let roster = resolve_roster(spec);
     println!("Level seed: {}", seed);
 
     let mut app = random_physics_game_app(
-        mode,
         GameAppConfig {
             title: "CanicasBrawl",
             resolution: (540.0, 960.0),

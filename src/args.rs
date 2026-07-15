@@ -1,11 +1,10 @@
-use rapier_bevy::{SimulationMode, session_duration_secs};
+use rapier_bevy::session_duration_secs;
 
 use crate::game::background::palette::ColorPalette;
 
 pub enum Command {
-    Simulation(SimulationMode, u64, RosterSpec, ColorPalette, f32),
+    Simulation(u64, RosterSpec, ColorPalette, f32),
     BuildModules,
-    PreprocessConcaveColliders,
 }
 
 pub enum RosterSpec {
@@ -19,17 +18,9 @@ pub fn parse_command() -> Command {
     if args.iter().any(|a| a == "--process-modules") {
         return Command::BuildModules;
     }
-    if args.iter().any(|a| a == "--preprocess") {
-        return Command::PreprocessConcaveColliders;
-    }
-    let mode = if args.iter().any(|a| a == "--sim-raw") {
-        SimulationMode::Raw
-    } else {
-        SimulationMode::Precomputed
-    };
     let palette = parse_palette(&args);
     let video_secs = session_duration_secs().map(|secs| secs as f32).unwrap_or(60.0);
-    Command::Simulation(mode, parse_seed(&args), parse_roster_spec(&args), palette, video_secs)
+    Command::Simulation(parse_seed(&args), parse_roster_spec(&args), palette, video_secs)
 }
 
 fn parse_palette(args: &[String]) -> ColorPalette {

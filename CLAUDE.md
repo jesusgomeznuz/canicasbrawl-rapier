@@ -16,24 +16,18 @@ Leerlo siempre al inicio de cada sesión para saber qué está hecho y qué sigu
 # Compilar
 cargo build
 
-# Ejecutar en modo por defecto (Precomputed)
+# Jugar (única forma nativa; colisionadores siempre .compound precomputados)
 cargo run
 
-# Modos del juego
+# El otro comando del juego: el convertidor del editor
 cargo run -- --process-modules                      # raw JSON Figma → módulos finales
-cargo run -- --preprocess                           # OBJ → .compound VHACD
-cargo run -- --sim-raw                              # física sin precomputing (variante de Sim)
 
-# Modificadores (combinables con Sim)
-cargo run -- --debug                                # activa RapierDebugRenderPlugin
+# Modificadores del pipeline (los lee el engine)
 cargo run -- --record 30                            # graba 30 s → outputs/record_30s.mp4
 cargo run -- --write-timeline 60 --slots 9 --seed 7 # casting: SOLO física, canicas anónimas → outputs/simulation_60s.timeline + voice_tracker con slot_N
 cargo run -- --record 60 --play outputs/simulation_60s.timeline --seed 7 --characters A,B,...
                                                     # render desde timeline; el nombre i-ésimo viste al slot_i
 # Regla: write-timeline y record de la MISMA duración y seed (la meta depende de la duración)
-
-# Bench vive en el engine, no en el juego
-cd ../rapier-bevy && cargo run -- --bench falling-spheres 200
 ```
 
 La grabación requiere `ffmpeg` instalado (`brew install ffmpeg`).
@@ -42,30 +36,28 @@ La grabación requiere `ffmpeg` instalado (`brew install ffmpeg`).
 
 Dos crates: el **engine** reusable (`../rapier-bevy`) y el **juego** (`canicasbrawl-rapier`). Comparten target en `../rapier-bevy/target` (configurado en `.cargo/config.toml`).
 
-El engine no conoce al juego. El juego consume el engine vía `random_physics_game_app(mode, GameAppConfig { title, resolution, seed })` y compone encima sus fases (`simulation::run`).
+El engine no conoce al juego. El juego consume el engine vía `random_physics_game_app(GameAppConfig { title, resolution, seed })` y compone encima sus fases (`simulation::run`).
 
 ### `../rapier-bevy` — engine
 
 | Módulo | Responsabilidad |
 |---|---|
-| `src/engine.rs` | `random_physics_game_app(mode, config) -> App` — arma el `App` según el modo: física + `Dice` (nativo y write-timeline) o partitura (`--play`, donde duerme por necesidad ausente a quien declare choques o azar) |
+| `src/engine.rs` | `random_physics_game_app(config) -> App` — arma el `App` según el modo del pipeline: física + `Dice` (nativo y write-timeline) o partitura (`--play`, donde duerme por necesidad ausente a quien declare choques o azar) |
 | `src/timeline.rs` | El contrato bake/replay: `Timeline`, `Pose`, `TimelineKey`, `TimelineEvents`, `PlayEvent`, `Dice`, y la banda genérica (`TimelineVocabulary`, `run_the_event_band`, `EventBand`) |
-| `src/modes.rs` | `EngineMode`, `SimulationMode`, `BenchScene`, `parse_engine_mode(args)`, `record_duration()`, `write_timeline_duration()`, `timeline_path()`, `session_duration_secs()`, `debug_enabled()` |
+| `src/modes.rs` | La puerta del engine — preguntas puras sobre flags del pipeline: `record_duration()`, `write_timeline_duration()`, `timeline_path()`, `session_duration_secs()` |
 | `src/plugins/record.rs` | `RecordPlugin` — captura GPU offscreen y pipe a ffmpeg via `crossbeam-channel`. Expone `OffscreenTarget` |
-| `src/plugins/benchmark.rs` | `BenchmarkPlugin` / `run_bench_mode` — mide FPS promedio y p01 durante 600 frames |
 | `src/plugins/physics_stats.rs` | `PhysicsStatsPlugin` — overlay de estadísticas de física |
 | `src/world_objects/mod.rs` | `spawn_object` (API principal), tipos `ObjectDef`, `ColliderShape`, `VisualDef`, `JointDef` |
 | `src/world_objects/vehicle.rs` | `spawn_vehicle` con articulaciones tipo revoluta y motores |
 | `src/world_objects/chain.rs` | `spawn_chain` con `ChainDef` / `ChainPath` |
-| `src/world_objects/colliders.rs` | `build_collider` + `preprocess_obj` (VHACD → `.compound`) |
-| `src/world_objects/bench.rs` | Escenas de benchmark: esferas en caída, cajas apiladas, rejilla de cadenas |
+| `src/world_objects/colliders.rs` | `build_collider` (mallas SIEMPRE desde `.compound`) + `preprocess_obj` (VHACD → `.compound`, lo usa quien fabrica assets) |
 | `src/main.rs` | Demo del engine — consumidor del motor con su propia cámara y luces |
 
 ### `canicasbrawl-rapier` — juego
 
 ```
 src/
-  main.rs              parse_command + match top-level (3 comandos)
+  main.rs              parse_command + match top-level (2 comandos)
   args.rs              parseo CLI → Command
   simulation.rs        la vida del juego en 3 fases: on_start (nacer) /
                        on_update (el loop central: actos por semántica, cada
@@ -102,9 +94,8 @@ src/
 ```
 main
 └── match parse_command()
-    ├── ProcessModules  → content::process_modules::run()
-    ├── Preprocess      → engine::preprocess_assets()
-    └── Simulation(...)  → simulation::run(mode, seed, roster, palette, video_secs)
+    ├── BuildModules    → process_modules::run()
+    └── Simulation(...) → simulation::run(seed, roster, palette, video_secs)
 ```
 
 `simulation::run` es la vida del juego en tres fases: `on_start` (nacer),
@@ -118,8 +109,8 @@ la ficha técnica es visible.
 ## Convenciones clave
 
 - `spawn_object` es el constructor central: recibe `ObjectDef` con forma de colisionador, material visual, tipo de cuerpo, y joint opcional; todo lo demás (vehículos, cadenas) lo envuelve.
-- Los archivos `.compound` son colisionadores VHACD precomputados que `build_collider` carga cuando `SimMode::Precomputed`; `SimMode::Raw` usa la geometría exacta del OBJ.
-- `random_physics_game_app(mode, config)` se encarga de DefaultPlugins, RapierPhysicsPlugin + `Dice` (cuando toca física), FrameTimeDiagnostics, PhysicsStatsPlugin, RecordPlugin (si `--record`), PlayPlugin (si `--play`) y el debug renderer (si `--debug`). El juego compone encima sus fases con `add_systems` directo — sin Plugins-wrapper.
+- Los colisionadores de malla vienen SIEMPRE de archivos `.compound` (VHACD precomputado). Quien fabrica el asset fabrica su compound: `torus_assets.rs` llama `preprocess_obj` durante `--process-modules`. El juego nunca descompone geometría en runtime.
+- `random_physics_game_app(config)` se encarga de DefaultPlugins, RapierPhysicsPlugin + `Dice` (cuando toca física), FrameTimeDiagnostics, PhysicsStatsPlugin, RecordPlugin (si `--record`) y PlayPlugin (si `--play`). El juego compone encima sus fases con `add_systems` directo — sin Plugins-wrapper.
 - Cada juego pone su propia cámara, luces y `ClearColor`. Si necesita renderizar a `--record`, lee `Res<OffscreenTarget>` (recurso opcional inyectado por `RecordPlugin`).
 - La simulación corre en `FixedUpdate` a 60 steps/s (`TimestepMode::Fixed`, fijado en `engine.rs`). Toda la lógica de tiempo del juego vive en `FixedUpdate` para contar steps, no el wall-clock. En modo grabación, `RecordPlugin` usa `TimeUpdateStrategy::ManualDuration(1/60)`: cada frame avanza un step fijo y captura un frame de video (1 step = 1 frame), así la duración del MP4 == la del tiempo simulado. La aceleración de producción viene del loop headless (`run_loop(ZERO)`), no de un multiplicador de tiempo.
 
@@ -165,6 +156,6 @@ compila; un payload ilegible o keys que no cuadran hacen panic con mensaje.
 
 ## Cómo extender modos
 
-- **Modo nuevo del engine** (afecta a todos los juegos): añadir variante a `EngineMode` y rama en `parse_engine_mode`.
-- **Modo nuevo del juego** (solo canicasbrawl): añadir variante a `Command` en `main.rs`, una rama en `parse_command` y otra en el `match` de `main`.
-- **Modificador ortogonal** (combina con cualquier modo): exponer query en el engine (`fn xxx_enabled() -> bool`) y consultarla donde aplique.
+- **Modo nuevo del pipeline** (afecta a todos los juegos): pregunta pura nueva en `modes.rs` del engine y rama en el match de `random_physics_game_app`. El juego jamás se entera.
+- **Comando nuevo del juego** (solo canicasbrawl): añadir variante a `Command`, una rama en `parse_command` y otra en el `match` de `main`.
+- La regla de asinceramiento (2026-07-15): lo que no se usa se AMPUTA, no se archiva — `--debug`, `--bench`, `--preprocess` y `--sim-raw` murieron; git los guarda si un día hacen falta.

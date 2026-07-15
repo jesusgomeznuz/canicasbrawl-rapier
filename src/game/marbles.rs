@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use rapier_bevy::{
-    AssetsLoading, BodyType, ColliderShape, LockedAxes, ObjectDef, SimulationMode, TimelineKey, spawn_object,
+    AssetsLoading, BodyType, ColliderShape, LockedAxes, ObjectDef, TimelineKey, spawn_object,
 };
 
 use super::faces::{attach_marble_face, dominant_color_from_png};
@@ -18,7 +18,6 @@ pub struct MarbleIndex(pub usize);
 
 pub fn spawn_marbles(
     commands: &mut Commands,
-    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -34,7 +33,6 @@ pub fn spawn_marbles(
             .unwrap_or(Color::WHITE);
         let entity = spawn_marble_body(
             commands,
-            mode,
             asset_server,
             meshes,
             materials,
@@ -77,7 +75,6 @@ fn spawn_grid(cx: f32, cy: f32) -> [(f32, f32); 9] {
 
 fn spawn_marble_body(
     commands: &mut Commands,
-    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -112,7 +109,6 @@ fn spawn_marble_body(
             collision_groups: Some(super::sensors::freeze::marble_groups()),
             ..Default::default()
         },
-        mode,
         asset_server,
         meshes,
         materials,

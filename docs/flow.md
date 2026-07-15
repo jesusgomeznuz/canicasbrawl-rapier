@@ -6,18 +6,16 @@ Diagramas vivos. Cuando el código cambie, corre `/update-flow` y Claude actuali
 
 ```mermaid
 flowchart TD
-    Start([cargo run]) --> Parse["args::parse_command()<br/>--process-modules / --preprocess / --sim-raw<br/>--seed N (random si falta)<br/>--slots N o --characters A,B,... (excluyentes)<br/>--rosa / --neon (paleta; default azul)<br/>--write-timeline T / --play X.timeline / --record T (los lee el engine)"]
+    Start([cargo run]) --> Parse["args::parse_command()<br/>--process-modules<br/>--seed N (random si falta)<br/>--slots N o --characters A,B,... (excluyentes)<br/>--rosa / --neon (paleta; default azul)<br/>--write-timeline T / --play X.timeline / --record T (los lee el engine)"]
     Parse --> Match{match Command}
     Match -- BuildModules --> Editor["process_modules::run()"]
-    Match -- PreprocessConcaveColliders --> Pre["preprocess_concave_colliders"]
-    Match -- "Simulation(mode, seed, roster, palette)" --> Run["simulation::run<br/>roster: Default | Characters | Slots(n)"]
+    Match -- "Simulation(seed, roster, palette, video_secs)" --> Run["simulation::run<br/>roster: Default | Characters | Slots(n)"]
 
-    Run --> Fases["random_physics_game_app(mode, config con seed)<br/>━━━━━━━━━━━━━<br/>on_start — nacer:<br/>prepare_the_race (elenco + marcador),<br/>build_the_world (mundo, gravedad, cámara, corona),<br/>paint_the_backdrop (cielo, estrellas, nubes),<br/>initialize_voice_tracker (producción enciende el micrófono)<br/>━━━━━━━━━━━━━<br/>on_update — el loop central, actos por semántica<br/>(cada uno declara su ritmo adentro):<br/>• generate_the_level — el director tira los Dice del engine (FixedUpdate)<br/>• run_the_sensors — oídos, relojes e insignias<br/>• run_the_event_band::&lt;RaceEvent&gt; (engine) + stage_race_events<br/>• track_the_leader — meta → líder → voz (chain), cámara,<br/>&nbsp;&nbsp;corona persiguiendo (PostUpdate)<br/>• animate_the_backdrop + follow_the_marbles — lo visual persigue<br/>━━━━━━━━━━━━━<br/>on_exit — morir: save_voice_tracker_on_exit"]
+    Run --> Fases["random_physics_game_app(config con seed)<br/>━━━━━━━━━━━━━<br/>on_start — nacer:<br/>prepare_the_race (elenco + marcador),<br/>build_the_world (mundo, gravedad, cámara, corona),<br/>paint_the_backdrop (cielo, estrellas, nubes),<br/>initialize_voice_tracker (producción enciende el micrófono)<br/>━━━━━━━━━━━━━<br/>on_update — el loop central, actos por semántica<br/>(cada uno declara su ritmo adentro):<br/>• generate_the_level — el director tira los Dice del engine (FixedUpdate)<br/>• run_the_sensors — oídos, relojes e insignias<br/>• run_the_event_band::&lt;RaceEvent&gt; (engine) + stage_race_events<br/>• track_the_leader — meta → líder → voz (chain), cámara,<br/>&nbsp;&nbsp;corona persiguiendo (PostUpdate)<br/>• animate_the_backdrop + follow_the_marbles — lo visual persigue<br/>━━━━━━━━━━━━━<br/>on_exit — morir: save_voice_tracker_on_exit"]
 
     Fases --> Dark["el ENGINE decide el mundo, a oscuras del juego:<br/>nativo y --write-timeline → física + Dice en la mesa<br/>--play → sin física ni Dice: la partitura dicta poses y eventos,<br/>y todo sistema que declare choques (EventReader&lt;CollisionEvent&gt;)<br/>o azar (ResMut&lt;Dice&gt;) se duerme solo"]
 
     Editor --> End([exit])
-    Pre --> End
     Dark --> Loop["app.run"]
     Loop --> End
 ```
@@ -26,7 +24,9 @@ flowchart TD
 `on_exit`), sin una sola rama de modos: el juego declara necesidades y el
 engine arma la mesa. Cmd+click sobre cualquier system salta a su implementación.
 
-`--bench` no es modo del juego. Para correrlo: `cd ../rapier-bevy && cargo run -- --bench falling-spheres 200`.
+Asinceramiento 2026-07-15: `--preprocess`, `--sim-raw`, `--debug` y `--bench`
+murieron (nunca se usaban; git los guarda). Los colisionadores de malla vienen
+SIEMPRE de `.compound` — quien fabrica el asset fabrica su compound.
 
 ## 2. Composición engine ↔ juego
 
@@ -87,7 +87,7 @@ publisher, con feedback de métricas al planner). Sus diagramas viven en
 
 ```mermaid
 flowchart TD
-    main["main.rs<br/>match: 3 comandos"] --> args["args.rs<br/>Command, RosterSpec"]
+    main["main.rs<br/>match: 2 comandos"] --> args["args.rs<br/>Command, RosterSpec"]
     main --> sim["simulation.rs<br/>3 fases de vida:<br/>on_start / on_update / on_exit<br/>cero ramas de modo"]
     main --> pm["process_modules/<br/>mod: run + transform<br/>shapes: un from_raw por forma<br/>torus_assets: .obj/.compound"]
 

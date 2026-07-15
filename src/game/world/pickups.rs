@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use rand::Rng;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
-use rapier_bevy::{BodyType, ColliderShape, ObjectDef, SimulationMode, spawn_object};
+use rapier_bevy::{BodyType, ColliderShape, ObjectDef, spawn_object};
 
 pub fn resolve_slot_variant<'a>(
     options: &'a [String],
@@ -36,7 +36,6 @@ pub fn spawn_invisible_sensor(
     w: f32,
     h: f32,
     rot: f32,
-    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -56,7 +55,6 @@ pub fn spawn_invisible_sensor(
             visual: None,
             ..Default::default()
         },
-        mode,
         asset_server,
         meshes,
         materials,

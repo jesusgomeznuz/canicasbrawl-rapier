@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier3d::plugin::context::DefaultRapierContext;
 use bevy_rapier3d::prelude::*;
-use rapier_bevy::{AssetsLoading, SimulationMode};
+use rapier_bevy::AssetsLoading;
 
 use super::level_generation::{FinishTarget, LevelGen};
 use super::structures::spawn_wall_segment;
@@ -9,7 +9,6 @@ use crate::game::background::palette::ColorPalette;
 
 pub fn setup(
     mut commands: Commands,
-    mode: Res<SimulationMode>,
     finish_target: Res<FinishTarget>,
     roster: Res<crate::game::roster::Roster>,
     palette: Res<ColorPalette>,
@@ -29,7 +28,6 @@ pub fn setup(
         first_module_top,
         obstacle_color,
         &mut commands,
-        &mode,
         &asset_server,
         &mut meshes,
         &mut materials,
@@ -38,7 +36,6 @@ pub fn setup(
 
     crate::game::marbles::spawn_marbles(
         &mut commands,
-        &mode,
         &asset_server,
         &mut meshes,
         &mut materials,

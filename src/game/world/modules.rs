@@ -3,7 +3,7 @@ use bevy_rapier3d::prelude::ActiveEvents;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rapier_bevy::{
-    BodyType, ColliderShape, ObjectDef, SimulationMode, TimelineKey, VisualDef, spawn_object,
+    BodyType, ColliderShape, ObjectDef, TimelineKey, VisualDef, spawn_object,
 };
 
 use super::pickups::{
@@ -82,7 +82,6 @@ pub fn spawn_module(
     obstacle_color: Color,
     module_seed: u64,
     commands: &mut Commands,
-    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -144,7 +143,6 @@ pub fn spawn_module(
                         friction: Some(friction.unwrap_or(0.15)),
                         ..Default::default()
                     },
-                    mode,
                     asset_server,
                     meshes,
                     materials,
@@ -177,7 +175,6 @@ pub fn spawn_module(
                         friction: Some(friction.unwrap_or(0.15)),
                         ..Default::default()
                     },
-                    mode,
                     asset_server,
                     meshes,
                     materials,
@@ -219,7 +216,6 @@ pub fn spawn_module(
                         friction: Some(friction.unwrap_or(0.15)),
                         ..Default::default()
                     },
-                    mode,
                     asset_server,
                     meshes,
                     materials,
@@ -266,7 +262,6 @@ pub fn spawn_module(
                     *w,
                     *h,
                     *rot,
-                    mode,
                     asset_server,
                     meshes,
                     materials,
@@ -293,7 +288,6 @@ pub fn spawn_module(
                     *w,
                     *h,
                     *rot,
-                    mode,
                     asset_server,
                     meshes,
                     materials,

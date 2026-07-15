@@ -1,11 +1,10 @@
 use bevy::prelude::*;
 use rapier_bevy::{
-    ColliderShape, ObjectDef, SimulationMode, VisualAppearance, VisualDef, spawn_object,
+    ColliderShape, ObjectDef, VisualAppearance, VisualDef, spawn_object,
 };
 
 pub fn spawn_floor(
     commands: &mut Commands,
-    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -30,7 +29,6 @@ pub fn spawn_floor(
             friction: Some(0.7),
             ..Default::default()
         },
-        mode,
         asset_server,
         meshes,
         materials,
@@ -42,7 +40,6 @@ pub fn spawn_wall_segment(
     bottom: f32,
     obstacle_color: Color,
     commands: &mut Commands,
-    mode: &SimulationMode,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -66,7 +63,6 @@ pub fn spawn_wall_segment(
                 restitution: Some(0.05),
                 ..Default::default()
             },
-            mode,
             asset_server,
             meshes,
             materials,
