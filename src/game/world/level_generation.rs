@@ -28,6 +28,28 @@ impl LevelGen {
     }
 }
 
+/// Dónde empieza el primer módulo: la geometría compartida entre los muros
+/// iniciales (spawn_walls) y el arranque de la pista.
+pub fn first_module_top() -> f32 {
+    let spawn_y = 0.0;
+    let top_margin = 0.6;
+    spawn_y - top_margin
+}
+
+/// El primer módulo nace con el mundo: el director tira los dados una vez
+/// antes de que ruede nada y deja lista su memoria (LevelGen). Declara
+/// `ResMut<Dice>`: en --play duerme solo y el módulo llega de la partitura.
+pub fn spawn_first_module(
+    mut commands: Commands,
+    finish_target: Res<crate::game::race::finish::FinishTarget>,
+    mut dice: ResMut<Dice>,
+    mut events: EventWriter<RaceEvent>,
+) {
+    let mut level_gen = LevelGen::new(first_module_top(), finish_target.0);
+    generate_next_module(&mut level_gen, &mut dice, &mut events);
+    commands.insert_resource(level_gen);
+}
+
 pub fn generate_level(
     sim_time: Res<Time<Fixed>>,
     marbles: Query<&Transform, With<Marble>>,
@@ -40,17 +62,7 @@ pub fn generate_level(
     };
     match decide_level_action(&level_gen, leader_y, sim_time.elapsed_secs()) {
         LevelGenerationAction::GenerateModule => {
-            let name = pick_module(&level_gen, &mut dice);
-            let top = level_gen.next_top;
-            let module_seed = dice.next_u64();
-            events.write(RaceEvent::Module {
-                name: name.to_string(),
-                top,
-                seed: module_seed,
-            });
-            level_gen.next_top = top - module_height(name);
-            level_gen.last_module = Some(name);
-            level_gen.modules_spawned += 1;
+            generate_next_module(&mut level_gen, &mut dice, &mut events);
         }
         LevelGenerationAction::SpawnFinishLine => {
             events.write(RaceEvent::Finish {
@@ -60,6 +72,23 @@ pub fn generate_level(
         }
         LevelGenerationAction::DoNothing => {}
     }
+}
+
+/// El gesto del director: elegir módulo con los dados, anunciarlo a la banda
+/// y avanzar su memoria. Lo comparten el nacimiento (spawn_first_module) y la
+/// carrera (generate_level).
+fn generate_next_module(level_gen: &mut LevelGen, dice: &mut Dice, events: &mut EventWriter<RaceEvent>) {
+    let name = pick_module(level_gen, dice);
+    let top = level_gen.next_top;
+    let module_seed = dice.next_u64();
+    events.write(RaceEvent::Module {
+        name: name.to_string(),
+        top,
+        seed: module_seed,
+    });
+    level_gen.next_top = top - module_height(name);
+    level_gen.last_module = Some(name);
+    level_gen.modules_spawned += 1;
 }
 
 pub fn spawn_level_module(

@@ -77,7 +77,7 @@ src/
       staging.rs           escenografía única de ambos mundos (consume RaceEvent)
       sensors/             trampas: freeze, shrink, swap, bouncy + badges e icons
       pickups.rs           qué efecto cae en cada slot
-      setup.rs / structures.rs  arranque del escenario; suelo y paredes
+      structures.rs        muros, gravedad, suelo — los pisos de la obra
     race/              LA CARRERA: quiénes corren y quién gana
       roster.rs            casting: quién corre (build_roster / slots_roster)
       faces.rs             la cara: disco + PNG del personaje + color dominante

@@ -11,7 +11,7 @@ flowchart TD
     Match -- BuildModules --> Editor["process_modules::run()"]
     Match -- "Simulation(seed, roster, palette, video_secs)" --> Run["simulation::run<br/>roster: Default | Characters | Slots(n)"]
 
-    Run --> Fases["game_app(config con seed)<br/>━━━━━━━━━━━━━<br/>on_start — nacer:<br/>prepare_the_race (elenco + marcador + reglas + el micrófono de producción),<br/>build_the_world (mundo, gravedad, cámara, corona),<br/>prepare_the_scene (semilla del telón, paleta, cielo, estrellas, nubes)<br/>━━━━━━━━━━━━━<br/>on_update — el loop central, actos por semántica<br/>(cada uno declara su ritmo adentro):<br/>• generate_the_level — el director tira los Dice del engine (FixedUpdate)<br/>• run_the_sensors — oídos, relojes e insignias<br/>• run_the_event_band::&lt;RaceEvent&gt; (engine) + stage_race_events<br/>• track_the_leader — meta → líder → voz (chain), cámara,<br/>&nbsp;&nbsp;corona persiguiendo (PostUpdate)<br/>• animate_the_backdrop + follow_the_marbles — lo visual persigue<br/>━━━━━━━━━━━━━<br/>on_exit — morir: save_voice_tracker_on_exit"]
+    Run --> Fases["game_app(config con seed)<br/>━━━━━━━━━━━━━<br/>on_start — nacer:<br/>prepare_the_race (elenco + marcador + reglas + el micrófono de producción),<br/>build_the_world (muros, gravedad, primer módulo,<br/>canicas, cámara, corona — los 6 pisos a la vista),<br/>prepare_the_scene (semilla del telón, paleta, cielo, estrellas, nubes)<br/>━━━━━━━━━━━━━<br/>on_update — el loop central, actos por semántica<br/>(cada uno declara su ritmo adentro):<br/>• generate_the_level — el director tira los Dice del engine (FixedUpdate)<br/>• run_the_sensors — oídos, relojes e insignias<br/>• run_the_event_band::&lt;RaceEvent&gt; (engine) + stage_race_events<br/>• track_the_leader — meta → líder → voz (chain), cámara,<br/>&nbsp;&nbsp;corona persiguiendo (PostUpdate)<br/>• animate_the_backdrop + follow_the_marbles — lo visual persigue<br/>━━━━━━━━━━━━━<br/>on_exit — morir: save_voice_tracker_on_exit"]
 
     Fases --> Dark["el ENGINE decide el mundo, a oscuras del juego:<br/>nativo y --write-timeline → física + Dice en la mesa<br/>--play → sin física ni Dice: la partitura dicta poses y eventos,<br/>y todo sistema que declare choques (EventReader&lt;CollisionEvent&gt;)<br/>o azar (ResMut&lt;Dice&gt;) se duerme solo"]
 
@@ -92,7 +92,7 @@ flowchart TD
     main --> pm["process_modules/<br/>mod: run + transform<br/>shapes: un from_raw por forma<br/>torus_assets: .obj/.compound"]
 
     sim --> aduana["race_events.rs<br/>ADUANA: enum RaceEvent<br/>derive de serde = ida y vuelta<br/>desde la estructura misma<br/>(la banda vive en el engine)"]
-    sim --> worlddir["world/ — EL MUNDO (interactuable)<br/>level_generation: el director de pista<br/>modules: aduana JSON + spawn_module<br/>marbles: el cuerpo de la canica<br/>staging: la escenografía de ambos mundos<br/>sensors/: freeze, shrink, swap, bouncy<br/>pickups + setup + structures"]
+    sim --> worlddir["world/ — EL MUNDO (interactuable)<br/>level_generation: el director de pista<br/>modules: aduana JSON + spawn_module<br/>marbles: el cuerpo de la canica<br/>staging: la escenografía de ambos mundos<br/>sensors/: freeze, shrink, swap, bouncy<br/>pickups + structures"]
     sim --> racedir["race/ — LA CARRERA<br/>roster: casting · faces: la cara<br/>labels: etiquetas de nombre<br/>finish: meta + FinishTarget<br/>leader: el líder + su corona"]
     sim --> scenedir["scene/ — LA ESCENA<br/>background/: telón + BackdropSeed<br/>camera: encuadre y luces"]
     sim --> tracker["production/ — EL OBSERVADOR<br/>voice_tracker.rs"]

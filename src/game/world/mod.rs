@@ -6,22 +6,24 @@ pub mod marbles;
 pub mod modules;
 pub mod pickups;
 pub mod sensors;
-pub mod setup;
 pub mod staging;
 pub mod structures;
 
 pub use sensors::run_the_sensors;
 
-/// El escenario donde se corre: pura obra física — arena, gravedad, y la
-/// cámara con sus luces y la corona, que también son entidades que se colocan
-/// en el mundo (actualizarlas ya es oficio de track_the_leader). Cero
-/// pizarras: construir significa construir.
+/// El EDIFICIO del nacimiento: los pisos de la obra, todos a la vista — muros,
+/// gravedad, el primer módulo (el director tira los dados por primera vez),
+/// las canicas (el mundo le pone cuerpo al elenco), y la cámara y la corona,
+/// que también son entidades que se colocan en el mundo (actualizarlas ya es
+/// oficio de track_the_leader). Cero pizarras: construir significa construir.
 pub fn build_the_world(app: &mut App) {
     app.add_systems(
         Startup,
         (
-            setup::setup,
-            setup::set_gravity,
+            structures::spawn_walls,
+            structures::set_gravity,
+            level_generation::spawn_first_module,
+            marbles::spawn_marbles,
             crate::game::scene::camera::spawn_camera_and_lights,
             crate::game::race::leader::spawn_crown,
         ),

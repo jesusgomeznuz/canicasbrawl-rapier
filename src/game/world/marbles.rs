@@ -16,42 +16,44 @@ pub struct MarbleName(pub String);
 #[derive(Component)]
 pub struct MarbleIndex(pub usize);
 
+/// El mundo le pone cuerpo al elenco de la carrera: nacen las canicas, cada
+/// una con su identidad (índice + TimelineKey), su etiqueta y su cara.
 pub fn spawn_marbles(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
-    roster: &[MarbleConfig],
-    spawn_cx: f32,
-    spawn_cy: f32,
-    assets_loading: &mut Option<ResMut<AssetsLoading>>,
+    mut commands: Commands,
+    roster: Res<crate::game::race::roster::Roster>,
+    asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut assets_loading: Option<ResMut<AssetsLoading>>,
 ) {
+    let spawn_cx = 0.0;
+    let spawn_cy = 0.0;
     let grid = spawn_grid(spawn_cx, spawn_cy);
-    for (i, (config, position)) in roster.iter().zip(grid.iter()).enumerate() {
+    for (i, (config, position)) in roster.0.iter().zip(grid.iter()).enumerate() {
         let color = config.image.as_deref()
             .and_then(dominant_color_from_png)
             .unwrap_or(Color::WHITE);
         let entity = spawn_marble_body(
-            commands,
-            asset_server,
-            meshes,
-            materials,
+            &mut commands,
+            &asset_server,
+            &mut meshes,
+            &mut materials,
             config,
             *position,
             color,
         );
         commands.entity(entity).insert((MarbleIndex(i), TimelineKey(i as u64)));
-        spawn_marble_label(commands, asset_server, entity, &config.nickname);
+        spawn_marble_label(&mut commands, &asset_server, entity, &config.nickname);
         if let Some(image) = &config.image {
             attach_marble_face(
-                commands,
+                &mut commands,
                 entity,
                 image,
                 color,
-                asset_server,
-                meshes,
-                materials,
-                assets_loading,
+                &asset_server,
+                &mut meshes,
+                &mut materials,
+                &mut assets_loading,
             );
         }
     }
