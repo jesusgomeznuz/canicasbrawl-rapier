@@ -1,8 +1,7 @@
 mod args;
 mod game;
-mod process_modules;
+mod figma_to_modules;
 mod production;
-mod simulation;
 
 use args::Command;
 
@@ -11,9 +10,9 @@ pub const UNIT: f32 = 0.35;
 
 fn main() {
     match args::parse_command() {
-        Command::Simulation(seed, roster, palette, video_secs) => {
-            simulation::run(seed, roster, palette, video_secs)
+        Command::Play(seed, roster, palette, video_secs) => {
+            game::run(seed, roster, palette, video_secs)
         }
-        Command::BuildModules => process_modules::run(),
+        Command::BuildModules => figma_to_modules::run(),
     }
 }

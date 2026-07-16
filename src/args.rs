@@ -3,7 +3,7 @@ use rapier_bevy::session_duration_secs;
 use crate::game::scene::background::palette::ColorPalette;
 
 pub enum Command {
-    Simulation(u64, RosterSpec, ColorPalette, f32),
+    Play(u64, RosterSpec, ColorPalette, f32),
     BuildModules,
 }
 
@@ -20,7 +20,7 @@ pub fn parse_command() -> Command {
     }
     let palette = parse_palette(&args);
     let video_secs = session_duration_secs().map(|secs| secs as f32).unwrap_or(60.0);
-    Command::Simulation(parse_seed(&args), parse_roster_spec(&args), palette, video_secs)
+    Command::Play(parse_seed(&args), parse_roster_spec(&args), palette, video_secs)
 }
 
 fn parse_palette(args: &[String]) -> ColorPalette {

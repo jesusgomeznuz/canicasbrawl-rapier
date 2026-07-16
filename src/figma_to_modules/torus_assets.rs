@@ -28,7 +28,7 @@ fn write_torus_obj(path: &str, major_r: f32, minor_r: f32) {
     let n_major = 48usize;
     let n_minor = 24usize;
     let mut s = String::new();
-    s.push_str("# torus generado por process_modules\n");
+    s.push_str("# torus generado por figma_to_modules\n");
     for i in 0..n_major {
         let phi = std::f32::consts::TAU * (i as f32) / (n_major as f32);
         let (sin_phi, cos_phi) = phi.sin_cos();

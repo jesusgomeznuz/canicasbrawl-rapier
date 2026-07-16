@@ -59,15 +59,13 @@ El engine no conoce al juego. El juego consume el engine vía `game_app(GameAppC
 src/
   main.rs              parse_command + match top-level (2 comandos)
   args.rs              parseo CLI → Command
-  simulation.rs        la vida del juego en 3 fases: on_start (nacer) /
-                       on_update (el loop central: actos por semántica, cada
-                       gorda declara su ritmo adentro) / on_exit (morir).
-                       Cero ramas de modo: el juego nunca pregunta.
-  process_modules/     el convertidor del editor (espejo escritor de spawn_module)
+  figma_to_modules/    el convertidor del editor (espejo escritor de spawn_module)
     mod.rs             run + transform — el flowchart, con las aduanas RawModule/WorldObject
     shapes.rs          un from_raw por forma + parseo de tags del nombre
     torus_assets.rs    fábrica de .obj/.compound del torus
-  game/                LOS DIRECTORES — la responsabilidad vive en la estructura
+  game/                LA PORTADA (mod.rs: run + las 3 fases de vida — nacer,
+                       el loop central, morir; cero ramas de modo) y LOS
+                       DIRECTORES — la responsabilidad vive en la estructura
     race_events.rs     ADUANA de eventos: enum RaceEvent con derive de serde
                        (transversal — la banda que lo transporta vive en el engine)
     world/             EL MUNDO: la realidad interactuable
@@ -96,11 +94,11 @@ src/
 ```
 main
 └── match parse_command()
-    ├── BuildModules    → process_modules::run()
-    └── Simulation(...) → simulation::run(seed, roster, palette, video_secs)
+    ├── BuildModules    → figma_to_modules::run()
+    └── Play(...)       → game::run(seed, roster, palette, video_secs)
 ```
 
-`simulation::run` es la vida del juego en tres fases: `on_start` (nacer),
+`game::run` (la portada, `game/mod.rs`) es la vida del juego en tres fases: `on_start` (nacer),
 `on_update` (el loop central — actos agrupados por semántica, cada gorda
 declara su ritmo adentro con vocabulario Bevy: FixedUpdate la verdad, Update
 lo que se anima, PostUpdate los que persiguen) y `on_exit` (morir). Cada gorda

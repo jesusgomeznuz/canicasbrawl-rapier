@@ -8,8 +8,8 @@ Diagramas vivos. Cuando el código cambie, corre `/update-flow` y Claude actuali
 flowchart TD
     Start([cargo run]) --> Parse["args::parse_command()<br/>--process-modules<br/>--seed N (random si falta)<br/>--slots N o --characters A,B,... (excluyentes)<br/>--rosa / --neon (paleta; default azul)<br/>--write-timeline T / --play X.timeline / --record T (los lee el engine)"]
     Parse --> Match{match Command}
-    Match -- BuildModules --> Editor["process_modules::run()"]
-    Match -- "Simulation(seed, roster, palette, video_secs)" --> Run["simulation::run<br/>roster: Default | Characters | Slots(n)"]
+    Match -- BuildModules --> Editor["figma_to_modules::run()"]
+    Match -- "Play(seed, roster, palette, video_secs)" --> Run["game::run<br/>roster: Default | Characters | Slots(n)"]
 
     Run --> Fases["game_app(config con seed)<br/>━━━━━━━━━━━━━<br/>on_start — nacer:<br/>build_race (elenco + marcador + reglas + el micrófono de producción),<br/>build_world (muros, gravedad, primer módulo,<br/>canicas, cámara, corona — los 6 pisos a la vista),<br/><br/>build_scene (semilla del telón, paleta, cielo, estrellas, nubes)<br/>━━━━━━━━━━━━━<br/>on_update — el loop central, actos por semántica<br/>(cada uno declara su ritmo adentro):<br/>• update_world — el director tira los Dice (FixedUpdate)<br/>• update_sensors — oídos, relojes e insignias<br/>• follow_the_leader — meta → líder → voz (chain), cámara,<br/>&nbsp;&nbsp;corona (solo se sigue a UNO: al líder)<br/>• update_scene — lo visual se mantiene (cielo, estrellas,<br/>&nbsp;&nbsp;nubes y etiquetas)<br/>(la banda de eventos se conecta en run(), al armar la mesa:<br/>run_the_event_band::&lt;RaceEvent&gt; + stage_race_events)<br/>━━━━━━━━━━━━━<br/>on_exit — morir: save_voice_tracker_on_exit"]
 
@@ -20,7 +20,7 @@ flowchart TD
     Loop --> End
 ```
 
-`simulation.rs` es la vida del juego en tres fases (`on_start` → `on_update` →
+`game/mod.rs` — la portada — es la vida del juego en tres fases (`on_start` → `on_update` →
 `on_exit`), sin una sola rama de modos: el juego declara necesidades y el
 engine arma la mesa. Cmd+click sobre cualquier system salta a su implementación.
 
@@ -32,7 +32,7 @@ SIEMPRE de `.compound` — quien fabrica el asset fabrica su compound.
 
 ```mermaid
 flowchart LR
-    Game["canicasbrawl-rapier<br/>main + args + simulation<br/>+ game/ + production/ + process_modules/"] -->|game_app + add_systems| Engine
+    Game["canicasbrawl-rapier<br/>main + args<br/>+ game/ (portada + directores)<br/>+ production/ + figma_to_modules/"] -->|game_app + add_systems| Engine
     Engine["rapier-bevy<br/>engine, modes, timeline, plugins, world_objects"] -->|expone| API["API:<br/>spawn_object, ObjectDef, ColliderShape...<br/>timeline.rs: Timeline, Pose, TimelineKey,<br/>TimelineEvents, PlayEvent, Dice,<br/>run_the_event_band + EventBand<br/>WriteTimelinePlugin / PlayPlugin / RecordPlugin<br/>timeline_path / write_timeline_duration / record_duration<br/>/ session_duration_secs"]
     Demo["rapier-bevy/main.rs<br/>demo: vehículo + escalera"] -->|game_app + setup| Engine
 ```
@@ -48,7 +48,7 @@ declare choques o azar: el juego jamás pregunta por modos.
 ```mermaid
 flowchart LR
     Figma["Figma página Modules<br/>frames Crosses, Zigzag, ..."] -->|/export-module| Raw["assets/modules/raw/*.json"]
-    Raw -->|"cargo run -- --process-modules<br/>(process_modules/: shapes + torus_assets)"| Final["assets/modules/*.json"]
+    Raw -->|"cargo run -- --process-modules<br/>(figma_to_modules/: shapes + torus_assets)"| Final["assets/modules/*.json"]
     Final -->|"world::modules::load_module<br/>spawn vía RaceEvent::Module → staging"| World["Mundo Bevy<br/>plataformas + paredes + canicas"]
     World -->|cargo run| Window["Ventana interactiva"]
     World -->|"cargo run -- --record N"| Pipe["ffmpeg pipe"]
@@ -87,9 +87,9 @@ publisher, con feedback de métricas al planner). Sus diagramas viven en
 
 ```mermaid
 flowchart TD
-    main["main.rs<br/>match: 2 comandos"] --> args["args.rs<br/>Command, RosterSpec"]
-    main --> sim["simulation.rs<br/>3 fases de vida:<br/>on_start / on_update / on_exit<br/>cero ramas de modo"]
-    main --> pm["process_modules/<br/>mod: run + transform<br/>shapes: un from_raw por forma<br/>torus_assets: .obj/.compound"]
+    main["main.rs<br/>match: 2 comandos<br/>Play / BuildModules"] --> args["args.rs<br/>Command, RosterSpec"]
+    main --> sim["game/mod.rs — LA PORTADA<br/>run + 3 fases de vida:<br/>on_start / on_update / on_exit<br/>cero ramas de modo"]
+    main --> pm["figma_to_modules/<br/>mod: run + transform<br/>shapes: un from_raw por forma<br/>torus_assets: .obj/.compound"]
 
     sim --> aduana["race_events.rs<br/>ADUANA: enum RaceEvent<br/>derive de serde = ida y vuelta<br/>desde la estructura misma<br/>(la banda vive en el engine)"]
     sim --> worlddir["world/ — EL MUNDO (interactuable)<br/>level_generation: el director de pista<br/>modules: aduana JSON + spawn_module<br/>marbles: el cuerpo de la canica<br/>staging: la escenografía de ambos mundos<br/>sensors/: freeze, shrink, swap, bouncy<br/>pickups + structures"]
@@ -102,6 +102,6 @@ flowchart TD
     sim --> engine
 ```
 
-`simulation.rs` referencia cada system por su ruta completa
-(`game::sensors::freeze::on_freeze_contact`, `game::staging::stage_race_events`,
-...). Los `mod.rs` son índices puros — sin Plugins ni funciones de composición.
+La portada (`game/mod.rs`) llama a las gordas por director (`world::update_world`,
+`race::follow_the_leader`, ...) y cada gorda referencia sus systems por ruta —
+cmd+click en cadena hasta la implementación. Sin Plugins-wrapper.
