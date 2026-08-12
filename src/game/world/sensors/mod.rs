@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 
-pub mod badges;
+pub mod marble_timers;
 pub mod bouncy;
 pub mod freeze;
 pub mod icons;
@@ -13,9 +13,10 @@ pub mod swap;
 /// insignia. Antes estaban agrupados por CUÁNDO corren, así que freeze vivía
 /// partido en tres bloques distintos; ahora vive junto.
 ///
-/// Sueltas quedan las dos que no le pertenecen a ningún efecto: la insignia se
-/// mueve igual sea de freeze o de shrink, y spin_icons ni siquiera sabe que
-/// existen los sensores — gira cualquier cosa que traiga un SpinningIcon.
+/// Sueltas quedan las dos que no le pertenecen a ningún efecto, y por eso el
+/// nombre dice DE QUIÉN es cada una: los íconos son de la trampa (giran sobre
+/// ella, esperando), el cronómetro es de la canica (la persigue en pantalla
+/// contando lo que le queda). Ninguna pregunta de qué efecto viene.
 pub fn update_sensors(app: &mut App) {
     freeze::update_freeze(app);
     shrink::update_shrink(app);
@@ -23,9 +24,9 @@ pub fn update_sensors(app: &mut App) {
     bouncy::update_bouncy(app);
 
     // Girar un ícono es animación, no verdad de la carrera: vive en Update.
-    app.add_systems(Update, icons::spin_icons);
+    app.add_systems(Update, icons::update_sensor_icons);
     app.add_systems(
         PostUpdate,
-        badges::update_badges.after(TransformSystem::TransformPropagate),
+        marble_timers::update_marble_timers.after(TransformSystem::TransformPropagate),
     );
 }

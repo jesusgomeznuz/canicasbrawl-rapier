@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::sprite::ColorMaterial;
 use bevy_rapier3d::prelude::*;
 
-use super::badges::{EffectKind, EffectTimerBadge, spawn_badge};
+use super::marble_timers::{EffectKind, MarbleTimer, spawn_marble_timer};
 use crate::game::race_events::RaceEvent;
 use crate::game::scene::camera::world_pos_on_screen;
 use crate::game::world::marbles::{Marble, MarbleIndex};
@@ -17,7 +17,7 @@ pub fn update_freeze(app: &mut App) {
             .before(rapier_bevy::EventBand),
     );
     app.add_systems(FixedUpdate, try_unfreeze.after(PhysicsSet::Writeback));
-    app.add_systems(Update, manage_freeze_badges);
+    app.add_systems(Update, manage_freeze_timer);
 }
 
 #[derive(Component)]
@@ -99,23 +99,23 @@ pub fn try_unfreeze(
     }
 }
 
-pub fn manage_freeze_badges(
+pub fn manage_freeze_timer(
     mut commands: Commands,
     time: Res<Time>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut color_materials: ResMut<Assets<ColorMaterial>>,
-    needs_badge: Query<(Entity, &Frozen), (With<Marble>, Without<FreezeTimerMarker>)>,
+    needs_timer: Query<(Entity, &Frozen), (With<Marble>, Without<FreezeTimerMarker>)>,
     lost_freeze: Query<Entity, (With<Marble>, With<FreezeTimerMarker>, Without<Frozen>)>,
-    badges: Query<(Entity, &EffectTimerBadge)>,
+    timers: Query<(Entity, &MarbleTimer)>,
 ) {
-    for (marble_entity, frozen) in &needs_badge {
-        spawn_badge(&mut commands, &time, &mut meshes, &mut color_materials, marble_entity, frozen.expires_at, EffectKind::Freeze);
+    for (marble_entity, frozen) in &needs_timer {
+        spawn_marble_timer(&mut commands, &time, &mut meshes, &mut color_materials, marble_entity, frozen.expires_at, EffectKind::Freeze);
         commands.entity(marble_entity).insert(FreezeTimerMarker);
     }
     for marble_entity in &lost_freeze {
-        for (badge_entity, badge) in &badges {
-            if badge.marble == marble_entity && badge.kind == EffectKind::Freeze {
-                commands.entity(badge_entity).despawn();
+        for (timer_entity, timer) in &timers {
+            if timer.marble == marble_entity && timer.kind == EffectKind::Freeze {
+                commands.entity(timer_entity).despawn();
             }
         }
         commands.entity(marble_entity).remove::<FreezeTimerMarker>();

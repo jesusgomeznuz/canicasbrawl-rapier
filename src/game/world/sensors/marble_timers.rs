@@ -12,7 +12,7 @@ pub enum EffectKind {
 }
 
 #[derive(Component)]
-pub struct EffectTimerBadge {
+pub struct MarbleTimer {
     pub marble: Entity,
     pub expires_at: f32,
     pub started_at: f32,
@@ -21,7 +21,7 @@ pub struct EffectTimerBadge {
     pub arc_mesh: Handle<Mesh>,
 }
 
-pub fn spawn_badge(
+pub fn spawn_marble_timer(
     commands: &mut Commands,
     time: &Time,
     meshes: &mut Assets<Mesh>,
@@ -41,7 +41,7 @@ pub fn spawn_badge(
 
     commands
         .spawn((
-            EffectTimerBadge {
+            MarbleTimer {
                 marble: marble_entity,
                 expires_at,
                 started_at: time.elapsed_secs(),
@@ -61,7 +61,7 @@ pub fn spawn_badge(
                 MeshMaterial2d(color_materials.add(ColorMaterial::from_color(ring_bg))),
                 Transform::from_scale(Vec3::splat(arc_radius_px)),
             ));
-            // Arco — mismo handle que badge.arc_mesh; se muta in-place en update_badges
+            // Arco — mismo handle que timer.arc_mesh; se muta in-place en update_marble_timers
             parent.spawn((
                 Mesh2d(arc_mesh_handle),
                 MeshMaterial2d(color_materials.add(ColorMaterial::from_color(arc_color))),
@@ -70,34 +70,34 @@ pub fn spawn_badge(
         });
 }
 
-pub fn update_badges(
+pub fn update_marble_timers(
     time: Res<Time>,
     mut meshes: ResMut<Assets<Mesh>>,
     marbles: Query<&GlobalTransform, With<Marble>>,
-    mut badges: Query<(&EffectTimerBadge, &mut Transform)>,
+    mut timers: Query<(&MarbleTimer, &mut Transform)>,
     camera_q: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
-    let badge_offset = Vec3::new(0.13, 0.15, 0.0);
+    let timer_offset = Vec3::new(0.13, 0.15, 0.0);
     let Ok((camera, camera_global_transform)) = camera_q.single() else { return };
     let Some(viewport) = camera.logical_viewport_size() else { return };
 
-    for (badge, mut badge_transform) in &mut badges {
-        let remaining = (badge.expires_at - time.elapsed_secs()).max(0.0);
-        let total = (badge.expires_at - badge.started_at).max(0.01);
+    for (timer, mut timer_transform) in &mut timers {
+        let remaining = (timer.expires_at - time.elapsed_secs()).max(0.0);
+        let total = (timer.expires_at - timer.started_at).max(0.01);
         let fraction = (remaining / total).clamp(0.0, 1.0);
 
         // Mutación in-place del mesh — get_mut marca el asset como cambiado y fuerza
         // el re-upload al GPU sin commands deferred
-        if let Some(mesh) = meshes.get_mut(&badge.arc_mesh) {
+        if let Some(mesh) = meshes.get_mut(&timer.arc_mesh) {
             rebuild_arc_in_place(mesh, fraction);
         }
 
-        let Ok(marble_global_transform) = marbles.get(badge.marble) else { continue };
-        let world_pos = marble_global_transform.translation() + badge_offset;
+        let Ok(marble_global_transform) = marbles.get(timer.marble) else { continue };
+        let world_pos = marble_global_transform.translation() + timer_offset;
         if let Ok(screen) = camera.world_to_viewport(camera_global_transform, world_pos) {
-            badge_transform.translation.x = screen.x - viewport.x / 2.0;
-            badge_transform.translation.y = viewport.y / 2.0 - screen.y;
-            badge_transform.translation.z = 20.0;
+            timer_transform.translation.x = screen.x - viewport.x / 2.0;
+            timer_transform.translation.y = viewport.y / 2.0 - screen.y;
+            timer_transform.translation.z = 20.0;
         }
     }
 }

@@ -3,7 +3,7 @@ use bevy::sprite::ColorMaterial;
 use bevy_rapier3d::prelude::CollisionEvent;
 use bevy_rapier3d::plugin::PhysicsSet;
 
-use super::badges::{EffectKind, EffectTimerBadge, spawn_badge};
+use super::marble_timers::{EffectKind, MarbleTimer, spawn_marble_timer};
 use crate::game::race_events::RaceEvent;
 use crate::game::scene::camera::world_pos_on_screen;
 use crate::game::world::marbles::{Marble, MarbleIndex};
@@ -18,7 +18,7 @@ pub fn update_shrink(app: &mut App) {
             .before(rapier_bevy::EventBand),
     );
     app.add_systems(FixedUpdate, try_unshrink.after(PhysicsSet::Writeback));
-    app.add_systems(Update, manage_shrink_badges);
+    app.add_systems(Update, manage_shrink_timer);
 }
 
 #[derive(Component)]
@@ -77,23 +77,23 @@ pub fn try_unshrink(
     }
 }
 
-pub fn manage_shrink_badges(
+pub fn manage_shrink_timer(
     mut commands: Commands,
     time: Res<Time>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut color_materials: ResMut<Assets<ColorMaterial>>,
-    needs_badge: Query<(Entity, &Shrunk), (With<Marble>, Without<ShrinkTimerMarker>)>,
+    needs_timer: Query<(Entity, &Shrunk), (With<Marble>, Without<ShrinkTimerMarker>)>,
     lost_shrink: Query<Entity, (With<Marble>, With<ShrinkTimerMarker>, Without<Shrunk>)>,
-    badges: Query<(Entity, &EffectTimerBadge)>,
+    timers: Query<(Entity, &MarbleTimer)>,
 ) {
-    for (marble_entity, shrunk) in &needs_badge {
-        spawn_badge(&mut commands, &time, &mut meshes, &mut color_materials, marble_entity, shrunk.expires_at, EffectKind::Shrink);
+    for (marble_entity, shrunk) in &needs_timer {
+        spawn_marble_timer(&mut commands, &time, &mut meshes, &mut color_materials, marble_entity, shrunk.expires_at, EffectKind::Shrink);
         commands.entity(marble_entity).insert(ShrinkTimerMarker);
     }
     for marble_entity in &lost_shrink {
-        for (badge_entity, badge) in &badges {
-            if badge.marble == marble_entity && badge.kind == EffectKind::Shrink {
-                commands.entity(badge_entity).despawn();
+        for (timer_entity, timer) in &timers {
+            if timer.marble == marble_entity && timer.kind == EffectKind::Shrink {
+                commands.entity(timer_entity).despawn();
             }
         }
         commands.entity(marble_entity).remove::<ShrinkTimerMarker>();
