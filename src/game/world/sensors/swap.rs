@@ -1,9 +1,22 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::CollisionEvent;
+use bevy_rapier3d::plugin::PhysicsSet;
 
 use crate::game::race_events::RaceEvent;
 use crate::game::scene::camera::world_pos_on_screen;
 use crate::game::world::marbles::{Marble, MarbleIndex};
+
+/// El oficio completo de INTERCAMBIAR: el oído que encuentra pareja, y los
+/// anillos que se apagan solos. No lleva insignia — el cambio es instantáneo.
+pub fn update_swap(app: &mut App) {
+    app.add_systems(
+        FixedUpdate,
+        on_swap_contact
+            .after(PhysicsSet::Writeback)
+            .before(rapier_bevy::EventBand),
+    );
+    app.add_systems(FixedUpdate, fade_swap_rings.after(PhysicsSet::Writeback));
+}
 
 #[derive(Component)]
 pub struct SwapEffect;

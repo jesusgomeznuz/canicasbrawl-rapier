@@ -1,7 +1,23 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{CollisionEvent, Velocity};
+use bevy_rapier3d::plugin::PhysicsSet;
 
 use crate::game::race_events::RaceEvent;
+
+/// El oficio completo de REBOTAR: el oído que da el impulso, el pulso que se
+/// anima, y el enfriamiento que evita que se dispare en cadena.
+pub fn update_bouncy(app: &mut App) {
+    app.add_systems(
+        FixedUpdate,
+        trigger_bouncy_pulse
+            .after(PhysicsSet::Writeback)
+            .before(rapier_bevy::EventBand),
+    );
+    app.add_systems(
+        FixedUpdate,
+        (animate_bounce_pulse, tick_bounce_cooldown).after(PhysicsSet::Writeback),
+    );
+}
 
 #[derive(Component)]
 pub struct BouncyOnContact;

@@ -1,11 +1,25 @@
 use bevy::prelude::*;
 use bevy::sprite::ColorMaterial;
 use bevy_rapier3d::prelude::CollisionEvent;
+use bevy_rapier3d::plugin::PhysicsSet;
 
 use super::badges::{EffectKind, EffectTimerBadge, spawn_badge};
 use crate::game::race_events::RaceEvent;
 use crate::game::scene::camera::world_pos_on_screen;
 use crate::game::world::marbles::{Marble, MarbleIndex};
+
+/// El oficio completo de ENCOGER: el oído, el reloj que devuelve el tamaño, y
+/// la insignia del tiempo restante.
+pub fn update_shrink(app: &mut App) {
+    app.add_systems(
+        FixedUpdate,
+        on_shrink_contact
+            .after(PhysicsSet::Writeback)
+            .before(rapier_bevy::EventBand),
+    );
+    app.add_systems(FixedUpdate, try_unshrink.after(PhysicsSet::Writeback));
+    app.add_systems(Update, manage_shrink_badges);
+}
 
 #[derive(Component)]
 pub struct ShrinkEffect;

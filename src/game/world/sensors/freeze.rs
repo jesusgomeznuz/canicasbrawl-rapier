@@ -7,6 +7,19 @@ use crate::game::race_events::RaceEvent;
 use crate::game::scene::camera::world_pos_on_screen;
 use crate::game::world::marbles::{Marble, MarbleIndex};
 
+/// El oficio completo de CONGELAR: el oído que atrapa a la canica, el reloj
+/// que la suelta, y la insignia que va contando lo que le queda.
+pub fn update_freeze(app: &mut App) {
+    app.add_systems(
+        FixedUpdate,
+        on_freeze_contact
+            .after(PhysicsSet::Writeback)
+            .before(rapier_bevy::EventBand),
+    );
+    app.add_systems(FixedUpdate, try_unfreeze.after(PhysicsSet::Writeback));
+    app.add_systems(Update, manage_freeze_badges);
+}
+
 #[derive(Component)]
 pub struct FreezeEffect;
 
