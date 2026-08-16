@@ -5,3 +5,4 @@ outputs/
 assets/modules/raw/
 assets/effects/candidates/
 /2026-*.txt
+.cargo/config.toml
